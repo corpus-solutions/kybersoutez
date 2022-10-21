@@ -8,7 +8,8 @@ app.get('/', (req, res) => {
 
 app.post('/', (req, res) => {
   res.send('OK')
-  console.log({req.body});
+  let r = req.body;
+  console.log({rbo});
 })
 
 app.listen(port, () => {
