@@ -4,12 +4,11 @@ const port = 3333
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
-  console.log(req.body);
 })
 
 app.post('/', (req, res) => {
   res.send('OK')
-  console.log(req.body);
+  console.log({req.body});
 })
 
 app.listen(port, () => {
