@@ -1,6 +1,9 @@
 const express = require('express')
 const app = express()
 const port = 3333
+const bodyParser = require('body-parser');
+
+app.use(bodyParser);
 
 app.get('/', (req, res) => {
   res.send('Hello World!')
@@ -8,7 +11,7 @@ app.get('/', (req, res) => {
 
 app.post('/', (req, res) => {
   res.send('OK')
-  let r = req.body;
+  let rbo = req.body;
   console.log({rbo});
 })
 
