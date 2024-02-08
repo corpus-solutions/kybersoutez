@@ -25,7 +25,7 @@ services:
           cpus: '0.1'
           memory: 32M
       labels:
-        - "traefik.http.services.ctf24.loadbalancer.server.port=8888"
+        - "traefik.http.services.ctf24.loadbalancer.server.port=8889"
         - "traefik.enable=true"
         - "traefik.docker.network=traefik-public"
         - "traefik.constraint-label=traefik-public"

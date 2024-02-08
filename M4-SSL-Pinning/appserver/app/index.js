@@ -2,8 +2,11 @@ const express = require('express')
 const fs = require('fs');
 const https = require('https');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 
 const app = express()
+
+const port = 8889
 
 const opts = {
 	key: fs.readFileSync(path.join(__dirname, '/certs/server_key.pem')),
@@ -14,10 +17,6 @@ const opts = {
 		fs.readFileSync(path.join(__dirname, '/certs/server_cert.pem'))
 	]
 };
-
-const port = 3333
-
-const jwt = require('jsonwebtoken');
 
 const { v4: uuidv4, validate } = require('uuid');
 
@@ -100,8 +99,8 @@ app.listen(port, () => {
   console.log(`HTTP server started on port ${port}`)
 })
 
-https.createServer(opts, app).listen(4433, () => {
-  console.log("HTTPS server started on port 4433");
+https.createServer(opts, app).listen(8890, () => {
+  console.log("HTTPS server started on port 8890");
 });
 
 // TODO:

@@ -10,5 +10,6 @@ COPY ./app ./
 RUN npm ci --only=production
 
 EXPOSE 8889
+EXPOSE 8890
 USER node
 CMD [ "node", "index.js" ]
