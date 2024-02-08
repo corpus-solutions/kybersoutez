@@ -58,45 +58,21 @@ class MainActivity : AppCompatActivity() {
         val urlConnection = url.openConnection() as HttpsURLConnection
         urlConnection.sslSocketFactory = context.socketFactory
 
-        println("Fetching certificate pins...")
+        Log.i(TAG, "Fetching certificate pins...")
 
         try {
-
             val rd = BufferedReader(
                 InputStreamReader(urlConnection.inputStream)
             )
             var line: String?
             while (rd.readLine().also { line = it } != null) {
-                Log.i("data", line!!)
+                Log.d("SSLCertificatePins", line!!)
             }
         } catch (e: java.lang.Exception) {
             e.printStackTrace()
         } finally {
             urlConnection.disconnect()
         }
-        /*
-        var hurlConnection: HttpURLConnection? = null
-        try {
-            hurlConnection = url.openConnection() as HttpURLConnection
-            val code = hurlConnection.responseCode
-            if (code != 200) {
-                throw IOException("Invalid response from server: $code")
-            }
-            val rd = BufferedReader(
-                InputStreamReader(
-                    hurlConnection!!.inputStream
-                )
-            )
-            var line: String?
-            while (rd.readLine().also { line = it } != null) {
-                Log.i("data", line!!)
-            }
-        } catch (e: java.lang.Exception) {
-            e.printStackTrace()
-        } finally {
-            hurlConnection?.disconnect()
-        }
-        */
     }
 
     private fun verifyConnection() {
@@ -105,14 +81,14 @@ class MainActivity : AppCompatActivity() {
             val cf = CertificateFactory.getInstance("X.509")
             val caInput = resources.openRawResource(R.raw.trusted_roots)
             val ca: Certificate = cf.generateCertificate(caInput)
-            System.out.println("ca=" + (ca as X509Certificate).getSubjectDN())
+            Log.d(TAG, "ca=" + (ca as X509Certificate).getSubjectDN())
 
             // Create a KeyStore containing our trusted CAs
             val keyStoreType = KeyStore.getDefaultType()
             val keyStore = KeyStore.getInstance(keyStoreType)
             keyStore.load(null, null)
             keyStore.setCertificateEntry("ca", ca)
-            println("keyStoreType:" + keyStoreType)
+            Log.d(TAG, "keyStoreType:" + keyStoreType)
 
             // Create a TrustManager that trusts the CAs in our KeyStore
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
@@ -130,14 +106,28 @@ class MainActivity : AppCompatActivity() {
 
             /*** SSL Connection  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
-            val context = SSLContext.getInstance("TLSv1.2")
+            val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
-            val url = URL("https://192.168.10.10:4433/authenticate/")
+            val url = URL("https://ctf24.teacloud.net/authenticate/")
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
-            println("Weeeeeeeeeee")
-            val ins = urlConnection.inputStream // this throw exception
-            println(ins.toString())
+
+            Log.i(TAG,"Authenticating client as Alice")
+
+            try {
+                val rd = BufferedReader(
+                    InputStreamReader(urlConnection.inputStream)
+                )
+                var line: String?
+                while (rd.readLine().also { line = it } != null) {
+                    Log.d("SSLCertificatePins", line!!)
+                }
+            } catch (e: java.lang.Exception) {
+                e.printStackTrace()
+            } finally {
+                urlConnection.disconnect()
+            }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
