@@ -12,7 +12,7 @@ const app = express()
 // This would be preferably externally configurable using env var or Docker/Swarm secret
 const bcrypto = require("bcrypt")
 const crypto_rounds = 14
-const crypto_salt = "sslpinning.corpus.cz";
+const crypto_salt = process.env.SALT || "sslpinning.corpus.cz";
 const http_port = 8888
 
 //
@@ -60,6 +60,10 @@ function getCertificateDetails(certPath) {
 
 // HTTP service
 
+app.get('/', (req, res) => {
+  res.send("HEALTHCHECK")
+});
+
 app.get('/pin.json', (req, res) => {
 
   let pins = []
@@ -85,7 +89,6 @@ app.get('/pin.json', (req, res) => {
   // Sign with a challenge (to be verifiable on the client side using hash+salt)
   bcrypto.genSalt(crypto_rounds)
   .then(salt => {
-    console.log('Salt: ', salt+':'+crypto_salt)
     return bcrypto.hash(JSON.stringify(pins), salt+':'+crypto_salt)
   })
   .then(hash => {

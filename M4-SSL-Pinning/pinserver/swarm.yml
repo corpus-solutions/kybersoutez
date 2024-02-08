@@ -1,0 +1,51 @@
+# environment must be first imported using:
+# $ export $(cat .env)
+
+version: '3.7'
+
+networks:
+  traefik-public:
+    external: true
+
+services:
+
+  # This image is intentionally public, so the SSL pinning salt for X-Pin-Challenge would be more easily accessible
+  # not only from the client app, but also from the wide public (intentional mistake, otherwise this would reside in thinxcloud repo).
+  pinserver:
+    image: registry.thinx.cloud:5000/pinserver:latest
+    # password is injected through the thinx.pw file in test - files backend must be enabled there; otherwise uses Redis/GoAuth plugin
+    ports:
+      - 8888:8888
+    networks:
+      - traefik-public
+    environment:
+      - 'SALT=sslpinning.corpus.cz'
+    volumes:
+      - '/mnt/gluster/kybersoutez/data:/usr/src/app/data'
+      - '/mnt/gluster/kybersoutez/pin.json:/usr/src/app/pin.json'
+
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.05'
+          memory: 16M
+        limits:
+          cpus: '0.1'
+          memory: 32M
+        labels:
+          - swarmpit.service.deployment.autoredeploy=true
+
+          - "traefik.http.services.pinning.loadbalancer.server.port=8888"
+          - "traefik.enable=true"
+          - "traefik.docker.network=traefik-public"
+          - "traefik.constraint-label=traefik-public"
+
+          - "traefik.http.routers.pinning-http.rule=Host(`ssl.syxra.cz`)"
+          - "traefik.http.routers.pinning-http.entrypoints=http"
+          - "traefik.http.routers.pinning-http.middlewares=https-redirect"
+
+          - "traefik.http.routers.pinning-https.rule=Host(`ssl.syxra.cz`)"
+          - "traefik.http.routers.pinning-https.entrypoints=https"
+          - "traefik.http.routers.pinning-https.tls=true"
+          - "traefik.http.routers.pinning-https.tls.certresolver=le"
+          - "traefik.http.routers.pinning-https.middlewares=error-pages-middleware"
