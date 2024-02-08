@@ -1,0 +1,40 @@
+# environment must be first imported using:
+# $ export $(cat .env)
+
+version: '3.7'
+
+networks:
+  traefik-public:
+    external: true
+
+services:
+
+  pinapp:
+    image: registry.thinx.cloud:5000/ctf24:latest
+    ports:
+      - 8889:8889
+    networks:
+      - traefik-public
+
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+        limits:
+          cpus: '0.1'
+          memory: 32M
+      labels:
+        - "traefik.http.services.ctf24.loadbalancer.server.port=8888"
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik-public"
+        - "traefik.constraint-label=traefik-public"
+
+        - "traefik.http.routers.ctf24-https.rule=Host(`ctf24.teacloud.net`)"
+        - "traefik.http.routers.ctf24-https.entrypoints=https"
+        - "traefik.http.routers.ctf24-https.tls=true"
+        - "traefik.http.routers.ctf24-https.tls.certresolver=le"
+
+        - traefik.http.routers.ctf24-https.middlewares=error-pages-middleware
+
+        - swarmpit.service.deployment.autoredeploy=true
