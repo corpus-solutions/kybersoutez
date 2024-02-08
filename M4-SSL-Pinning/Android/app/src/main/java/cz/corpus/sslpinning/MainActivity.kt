@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
             // Create an SSLContext that uses our TrustManager and our KeyManager
             val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
-            val url = URL("https://ctf24.teacloud.net/authenticate/")
+            val url = URL("https://ctf24.teacloud.net/authenticate")
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
@@ -123,22 +123,22 @@ class MainActivity : AppCompatActivity() {
                     Log.d("SSLCertificatePins", line!!)
                 }
             } catch (e: java.lang.Exception) {
+                Log.d(TAG, "Authentication InputStream Exception:")
                 e.printStackTrace()
             } finally {
                 urlConnection.disconnect()
             }
 
         } catch (e: Exception) {
+            Log.d(TAG, "Verification Exception:")
             e.printStackTrace()
         }
     }
 
     private fun setupWebView() {
         val myWebView: WebView = findViewById(R.id.webview)
-        //val url = "http://192.168.10.10:3333/hello/" + UUID.randomUUID().toString()
-        //val url = "https://api.teacloud.net:3333/hello/" + UUID.randomUUID().toString()
 
-        // This should use HttpsURLConnection with client certificate
+        // This should use HttpsURLConnection with client certificate instead (old variant)
         val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
 
         myWebView.loadUrl(url)
