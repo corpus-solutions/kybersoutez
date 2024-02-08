@@ -45,16 +45,35 @@ function searchFile(dir, fileName) {
 }
 
 function getCertificateDetails(certPath) {
-  const cert = new node_crypto.X509Certificate(fs.readFileSync(certPath))
 
-  const timestamp = Date.parse(cert.validTo)/1000
-  const fingerprint = Buffer.from(cert.fingerprint256.replaceAll(":", ""), 'hex').toString('base64')
-  const subject = cert.subject.replace("CN=", "")
+  console.log("Fetching certificate from path: " + certPath)
+  
+  let certData;
+  try {
+    certData = fs.readFileSync(certPath);
+  } catch (e) {
+    console.error(e);
+    return {}
+  }
+   
+  try {
 
-  return {
-    name: subject,
-    fingerprint: fingerprint,
-    expires: timestamp
+  
+    let cert = new node_crypto.X509Certificate(certData)
+
+    const timestamp = Date.parse(cert.validTo)/1000
+    const fingerprint = Buffer.from(cert.fingerprint256.replaceAll(":", ""), 'hex').toString('base64')
+    const subject = cert.subject.replace("CN=", "")
+
+    return {
+      name: subject,
+      fingerprint: fingerprint,
+      expires: timestamp
+    }
+
+  } catch (e) {
+    console.error(e);
+    return {}
   }
 }
 
@@ -69,18 +88,22 @@ app.get('/pin.json', (req, res) => {
   let pins = []
 
   // Read JSON file with statically defined pins
-  if (fs.existsSync('pin.json')) {
-    const data = fs.readFileSync('pin.json', 'utf8')
+  const pinPath = __dirname + '/pin.json'
+  if (fs.existsSync(pinPath)) {
+    const data = fs.readFileSync(pinPath, 'utf8')
     pins = JSON.parse(data)
   }
 
   // Read certificates and dynamically build list of pins
   let paths = searchFile(__dirname + '/data', '.pem')
+  
+  // add fingerprints if non-existent
+  if (typeof(pins.fingerprints) === "undefined") pins.fingerprints = [];
+
   for (const cert of paths) {
     const certJSON = getCertificateDetails(cert)
-    // add fingerprints if non-existent
-    if (typeof(pins.fingerprints) === "undefined") pins.fingerprints = [];
-    pins.fingerprints.push(certJSON)
+    // add only non-empty objects to skip potential error leaks
+    if (JSON.stringify(certJSON) !== '{}') pins.fingerprints.push(certJSON)
   }
 
   // Add current timestamp
