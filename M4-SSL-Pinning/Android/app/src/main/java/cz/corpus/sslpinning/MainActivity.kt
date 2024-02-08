@@ -1,6 +1,7 @@
 package cz.corpus.sslpinning
 
 import android.annotation.SuppressLint
+import android.content.pm.ApplicationInfo
 import android.net.http.SslError
 import android.os.Bundle
 import android.util.Log
@@ -9,6 +10,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import java.io.BufferedReader
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URL
 import java.security.KeyStore
@@ -20,7 +22,6 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
-
 
 class MainActivity : AppCompatActivity() {
 
@@ -79,16 +80,26 @@ class MainActivity : AppCompatActivity() {
         try {
             /*** CA Certificate  */
             val cf = CertificateFactory.getInstance("X.509")
-            val caInput = resources.openRawResource(R.raw.trusted_roots)
+
+            val caInput: InputStream
+
+            val isDebuggable = 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
+
+            if (isDebuggable) {
+                caInput = resources.openRawResource(R.raw.trusted_roots_dev)
+            } else {
+                caInput = resources.openRawResource(R.raw.trusted_roots)
+            }
+
             val ca: Certificate = cf.generateCertificate(caInput)
-            Log.d(TAG, "ca=" + (ca as X509Certificate).getSubjectDN())
+            Log.d(TAG, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
 
             // Create a KeyStore containing our trusted CAs
             val keyStoreType = KeyStore.getDefaultType()
             val keyStore = KeyStore.getInstance(keyStoreType)
             keyStore.load(null, null)
             keyStore.setCertificateEntry("ca", ca)
-            Log.d(TAG, "keyStoreType:" + keyStoreType)
+            Log.d(TAG, "[verify] keyStoreType:" + keyStoreType)
 
             // Create a TrustManager that trusts the CAs in our KeyStore
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
@@ -109,10 +120,11 @@ class MainActivity : AppCompatActivity() {
             val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
             val url = URL("https://ctf24.teacloud.net/authenticate")
+
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
-            Log.i(TAG,"Authenticating client as Alice")
+            Log.i(TAG,"[verify] Authenticating client as Alice")
 
             try {
                 val rd = BufferedReader(
@@ -120,17 +132,17 @@ class MainActivity : AppCompatActivity() {
                 )
                 var line: String?
                 while (rd.readLine().also { line = it } != null) {
-                    Log.d("SSLCertificatePins", line!!)
+                    Log.d("[verify] SSLCertificatePins", line!!)
                 }
             } catch (e: java.lang.Exception) {
-                Log.d(TAG, "Authentication InputStream Exception:")
+                Log.d(TAG, "[verify] Authentication InputStream Exception:")
                 e.printStackTrace()
             } finally {
                 urlConnection.disconnect()
             }
 
         } catch (e: Exception) {
-            Log.d(TAG, "Verification Exception:")
+            Log.d(TAG, "[verify] Verification Exception:")
             e.printStackTrace()
         }
     }
