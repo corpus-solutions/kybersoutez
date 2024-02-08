@@ -1,42 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+
     <base-config cleartextTrafficPermitted="true">>
         <trust-anchors>
             <certificates src="@raw/trusted_roots"/>
             <certificates src="system"/>
         </trust-anchors>
     </base-config>
+
     <debug-overrides cleartextTrafficPermitted="true">
         <trust-anchors>
-            <certificates src="@raw/trusted_roots"/>
+            <!-- added Burp Suite certificate for development -->
+            <certificates src="@raw/trusted_roots_dev"/>
+            <certificates src="system"/>
         </trust-anchors>
     </debug-overrides>
-   <domain-config cleartextTrafficPermitted="false">
-       <domain includeSubdomains="true">www.syxra.cz</domain>
-       <trust-anchors>
-           <certificates src="@raw/trusted_roots"/>
-           <certificates src="system"/>
-       </trust-anchors>
-       <pin-set>
-           <!-- Expires: Tuesday 12 March 2024 at 4:13:47 Central European Standard Time (1710213227) -->
-           <pin digest="SHA-256">7tXqeI60LsIXFFYiZ86hThVFqXhf6ieGCcpeu0UJYro=</pin>
-       </pin-set>
-   </domain-config>
-    <domain-config>
-        <domain includeSubdomains="true">rtm.thinx.cloud</domain>
+
+    <domain-config cleartextTrafficPermitted="false>">
+        <domain includeSubdomains="false">ssl.thinx.cloud</domain>
         <trust-anchors>
             <certificates src="@raw/trusted_roots"/>
             <certificates src="system"/>
         </trust-anchors>
-        <pin-set> <!-- expiration="2024-03-12" -->
-            <!-- Expires: Tuesday 12 March 2024 at 4:13:05 Central European Standard Time (1710213185) -->
-            <pin digest="SHA-256">oGbomJGji9NfyRcIUmDROsL7eaSiAKQGuMF4R9w7VMU=</pin>
-            <!--  Let's Encrypt Authority X3  -->
-            <pin digest="SHA-256">YLh1dUR9y6Kja30RrAn7JKnbQG/uEtLMkBgFF2Fuihg=</pin>
-            <!-- DST Root CA X3 -->
-            <pin digest="SHA-256">Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=</pin>
-            <!-- LSE CA R3 -->
-            <pin digest="SHA-256">Z63RFmsCCuYbj1/JaBPATCqliZYHloZVcqPH5zdhPf0=</pin>
+        <pin-set>
+            <pin digest="SHA-256">AxdC+4sjPiiWLw4rofvKX6KGdmSwFl9RcVeRyFALcLI=</pin>
         </pin-set>
     </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false>">
+        <domain includeSubdomains="false">ctf24.teacloud.net</domain>
+        <trust-anchors>
+            <certificates src="@raw/trusted_roots"/>
+            <certificates src="system"/>
+        </trust-anchors>
+        <pin-set>
+            <pin digest="SHA-256">tleXExHroS0mCYxRQgjIiIfRnOBuZS4GMBxh0V6fKA4=</pin>
+            <pin digest="SHA-256">8j255pOhSMWMU3cxffzJn3rfsc07AgZbZYlFp6ytmuE=</pin>
+        </pin-set>
+    </domain-config>
+
 </network-security-config>
