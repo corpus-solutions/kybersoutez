@@ -22,6 +22,7 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
+import kotlin.coroutines.jvm.internal.CompletedContinuation.context
 
 class MainActivity : AppCompatActivity() {
 
@@ -108,7 +109,7 @@ class MainActivity : AppCompatActivity() {
             /*** Client Certificate  */
             val keyStore12 = KeyStore.getInstance("PKCS12")
             val certInput12 = resources.openRawResource(R.raw.alice)
-            keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray()) // todo get bundleId
+            keyStore12.load(certInput12, applicationContext.packageName)
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
