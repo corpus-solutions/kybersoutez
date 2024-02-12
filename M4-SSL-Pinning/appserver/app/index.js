@@ -15,15 +15,21 @@ Sentry.init({
 
 const app = express()
 
+// The request handler must be the first middleware on the app
+app.use(Sentry.Handlers.requestHandler());
+
+// TracingHandler creates a trace for every incoming request
+app.use(Sentry.Handlers.tracingHandler());
+
 const port = 8889
 
 const opts = {
 	key: fs.readFileSync(path.join(__dirname, '/certs/server_key.pem')),
 	cert: fs.readFileSync(path.join(__dirname, '/certs/server_cert.pem')),
 	requestCert: true,
-	rejectUnauthorized: false, // so we can do own error handling
+	rejectUnauthorized: true, // so we can do own error handling (changed from false!)
 	ca: [
-		fs.readFileSync(path.join(__dirname, '/certs/server_cert.pem'))
+		fs.readFileSync(path.join(__dirname, '/certs/server_ca.pem'))
 	]
 };
 
@@ -34,13 +40,25 @@ const secret = "NDc1MjQxNTQ1NTRjNTU0YTQ5MjA0YjIwNWFjZDUzNGJjMTRlY2QyMDQ0NTI1NTQ4
 
 app.use(express.json())
 
+// The error handler must be registered before any other error middleware and after all controllers
+app.use(Sentry.Handlers.errorHandler());
+
+// Optional fallthrough error handler
+app.use(function onError(err, req, res, next) {
+  // The error id is attached to `res.sentry` to be returned
+  // and optionally displayed to the user for support.
+  res.statusCode = 500;
+  res.end(res.sentry + "\n");
+});
+
 app.get('/authenticate', (req, res) => {
 
-  if (typeof(req.socket['getPeerCertificate']) !== "function") {
-    console.log(req.socket);
-    res.status(404).send('A am sorry');
+  /* may crash on getPeerCertificate() when called over HTTP
+  if (typeof(req.socket.getPeerCertificate()) !== "function") {
+    console.log("Socket:", req.socket);
+    res.status(404).send('A am sorry, no peer certificate.');
     return;
-  }
+  } */
 
 	const cert = req.socket.getPeerCertificate(); // not a function?
 
@@ -110,6 +128,10 @@ app.get('/hello/:id', (req, res) => {
   res.set('Authorization', 'Bearer ' + Buffer.from(token, 'utf-8'))
   res.send('<html><head><title></title><body><h1>Hello hacker.</h1><span style="color:white;">' + Buffer.from(token, 'utf-8') + '</span></body>')
 })
+
+app.get("/debug-sentry", function mainHandler(req, res) {
+  throw new Error("Test Sentry error!");
+});
 
 app.listen(port, () => {
   console.log(`HTTP server started on port ${port}`)
