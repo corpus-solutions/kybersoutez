@@ -63,13 +63,17 @@ app.get('/authenticate', (req, res) => {
 	const cert = req.socket.getPeerCertificate(); // not a function?
 
 	if (req.client.authorized) {
+    console.log("Client authorized, should receive a valid JWT!");
 		res.send(`Hello ${cert.subject.CN}, your certificate was issued by ${cert.issuer.CN}!`);
 
 	} else if (cert.subject) {
+    // .indexOf("ctf24.teacloud.net") === -1
+    console.log("Unknown subject in cert!", {cert});
 		res.status(403)
 			 .send(`Sorry ${cert.subject.CN}, certificates from ${cert.issuer.CN} are not welcome here.`);
 
 	} else {
+    console.log("Missing client certificate!");
 		res.status(401)
 		   .send(`Sorry, but you need to provide a client certificate to continue.`);
 	}
