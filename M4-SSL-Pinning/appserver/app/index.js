@@ -36,8 +36,9 @@ app.use(express.json())
 
 app.get('/authenticate', (req, res) => {
 
-  if (typeof(req.socket.getPeerCertificate()) !== "function") {
-    res.status(404).send('Sorry');
+  if (typeof(req.socket['getPeerCertificate']) !== "function") {
+    console.log(req.socket);
+    res.status(404).send('A am sorry');
     return;
   }
 
