@@ -4,6 +4,15 @@ const https = require('https');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 
+const Sentry = require("@sentry/node");
+
+Sentry.init({
+  dsn: "https://0d204f67985c47d6a91ddde728253df6@o265347.ingest.sentry.io/1468596",
+  // We recommend adjusting this value in production, or using tracesSampler
+  // for finer control
+  tracesSampleRate: 1.0,
+});
+
 const app = express()
 
 const port = 8889
@@ -26,7 +35,13 @@ const secret = "NDc1MjQxNTQ1NTRjNTU0YTQ5MjA0YjIwNWFjZDUzNGJjMTRlY2QyMDQ0NTI1NTQ4
 app.use(express.json())
 
 app.get('/authenticate', (req, res) => {
-	const cert = req.socket.getPeerCertificate();
+
+  if (typeof(req.socket.getPeerCertificate()) !== "function") {
+    res.status(404).send('Sorry');
+    return;
+  }
+
+	const cert = req.socket.getPeerCertificate(); // not a function?
 
 	if (req.client.authorized) {
 		res.send(`Hello ${cert.subject.CN}, your certificate was issued by ${cert.issuer.CN}!`);
