@@ -9,6 +9,7 @@ import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import com.scottyab.rootbeer.RootBeer
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -23,9 +24,11 @@ import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 
+
+//@Obfuscate
 class MainActivity : AppCompatActivity() {
 
-    var TAG:String = "MyApp"
+    var TAG:String = "SSLPinning"
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -33,6 +36,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         this.title = "CTF.2024"
+
+        val isDebuggable = 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
+        val rootBeer = RootBeer(this)
+        if (rootBeer.isRooted && !isDebuggable) {
+            Log.d("SSLPinning", "We found indication of root. Application will be terminated.")
+            this.finishAndRemoveTask()
+            System.exit(0)
+        } else {
+            Log.d("SSLPinning", "We didn't find indication of root or this is a Debug build.")
+        }
 
         Thread {
             fetchPins()
@@ -108,7 +121,21 @@ class MainActivity : AppCompatActivity() {
             /*** Client Certificate  */
             val keyStore12 = KeyStore.getInstance("PKCS12")
             val certInput12 = resources.openRawResource(R.raw.alice)
-            keyStore12.load(certInput12, applicationContext.packageName.toCharArray())
+            //keyStore12.load(certInput12, applicationContext.packageName.toCharArray())
+
+            // Log.d("PN:", applicationContext.packageName) // cz.corpus.sslpinning
+
+            val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
+            val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
+
+            //Log.d("CP:", cp.joinToString("."))
+            //Log.d("PC:", pc)
+
+
+            //!keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
+
+            keyStore12.load(certInput12, pc.toCharArray())
+            keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
