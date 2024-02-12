@@ -24,8 +24,9 @@ import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import io.sentry.Sentry
+import org.lsposed.lsparanoid.Obfuscate
 
-//@Obfuscate
+@Obfuscate
 class MainActivity : AppCompatActivity() {
 
     var tag:String = "SSLPinning"

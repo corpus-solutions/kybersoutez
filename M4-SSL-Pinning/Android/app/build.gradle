@@ -1,8 +1,8 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-
     id 'io.sentry.android.gradle' version '4.3.0'
+    id 'org.lsposed.lsparanoid' version '0.6.0'
 }
 
 android {
@@ -52,4 +52,11 @@ sentry {
     // this will upload your source code to Sentry to show it as part of the stack traces
     // disable if you don't want to expose your sources
     includeSourceContext = true
+}
+
+lsparanoid {
+    seed = null
+    classFilter = null
+    includeDependencies = false
+    variantFilter = { true }
 }
