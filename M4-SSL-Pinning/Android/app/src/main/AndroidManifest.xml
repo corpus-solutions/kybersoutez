@@ -26,7 +26,22 @@
                 android:name="android.app.lib_name"
                 android:value="" />
         </activity>
-    </application>
+    
+    <!-- Required: set your sentry.io project identifier (DSN) -->
+    <meta-data android:name="io.sentry.dsn" android:value="https://59087b76cef171f17fd54f8935b5eda0@o265347.ingest.sentry.io/4506734016397312" />
+
+    <!-- enable automatic breadcrumbs for user interactions (clicks, swipes, scrolls) -->
+    <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="true" />
+    <!-- enable screenshot for crashes (could contain sensitive/PII data) -->
+    <meta-data android:name="io.sentry.attach-screenshot" android:value="true" />
+    <!-- enable view hierarchy for crashes -->
+    <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="true" />
+
+    <!-- enable the performance API by setting a sample-rate, adjust in production env -->
+    <meta-data android:name="io.sentry.traces.sample-rate" android:value="1.0" />
+    <!-- enable profiling when starting transactions, adjust in production env -->
+    <meta-data android:name="io.sentry.traces.profiling.sample-rate" android:value="1.0" />
+</application>
 
     <uses-permission android:name="android.permission.INTERNET"/>
 

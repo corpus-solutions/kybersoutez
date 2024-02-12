@@ -23,28 +23,44 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
-
+import io.sentry.Sentry
 
 //@Obfuscate
 class MainActivity : AppCompatActivity() {
 
-    var TAG:String = "SSLPinning"
+    var tag:String = "SSLPinning"
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         setTheme(R.style.Theme_SSLPinning)
         super.onCreate(savedInstanceState)
+
+        /** This is stub for testing Sentry implementation.
+        // waiting for view to draw to better represent a captured error with a screenshot
+        findViewById<android.view.View>(android.R.id.content).viewTreeObserver.addOnGlobalLayoutListener {
+          try {
+            throw Exception("This app uses Sentry! :)")
+          } catch (e: Exception) {
+            Sentry.captureException(e)
+          }
+        }*/
+
         setContentView(R.layout.activity_main)
         this.title = "CTF.2024"
 
-        val isDebuggable = 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
         val rootBeer = RootBeer(this)
-        if (rootBeer.isRooted && !isDebuggable) {
+        if (rootBeer.isRooted) {
+            if (this.inDevelopment()) {
+                Sentry.captureMessage("Debugging on compromised device.")
+            } else {
+                Sentry.captureMessage("Terminated on compromised device in release mode.")
+                this.finishAndRemoveTask()
+                System.exit(0)
+            }
             Log.d("SSLPinning", "We found indication of root. Application will be terminated.")
-            this.finishAndRemoveTask()
-            System.exit(0)
         } else {
             Log.d("SSLPinning", "We didn't find indication of root or this is a Debug build.")
+            Sentry.captureMessage("Started on valid device.")
         }
 
         Thread {
@@ -72,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         val urlConnection = url.openConnection() as HttpsURLConnection
         urlConnection.sslSocketFactory = context.socketFactory
 
-        Log.i(TAG, "Fetching certificate pins...")
+        Log.i(tag, "Fetching certificate pins...")
 
         try {
             val rd = BufferedReader(
@@ -83,10 +99,15 @@ class MainActivity : AppCompatActivity() {
                 Log.d("SSLCertificatePins", line!!)
             }
         } catch (e: java.lang.Exception) {
+            if (inDevelopment()) e.printStackTrace()
             e.printStackTrace()
         } finally {
             urlConnection.disconnect()
         }
+    }
+
+    private fun inDevelopment(): Boolean {
+        return 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
     }
 
     private fun verifyConnection() {
@@ -96,23 +117,21 @@ class MainActivity : AppCompatActivity() {
 
             val caInput: InputStream
 
-            val isDebuggable = 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
-
-            if (isDebuggable) {
+            if (this.inDevelopment()) {
                 caInput = resources.openRawResource(R.raw.trusted_roots_dev)
             } else {
                 caInput = resources.openRawResource(R.raw.trusted_roots)
             }
 
             val ca: Certificate = cf.generateCertificate(caInput)
-            Log.d(TAG, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
+            Log.d(tag, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
 
             // Create a KeyStore containing our trusted CAs
             val keyStoreType = KeyStore.getDefaultType()
             val keyStore = KeyStore.getInstance(keyStoreType)
             keyStore.load(null, null)
             keyStore.setCertificateEntry("ca", ca)
-            Log.d(TAG, "[verify] keyStoreType:" + keyStoreType)
+            Log.d(tag, "[verify] keyStoreType:" + keyStoreType)
 
             // Create a TrustManager that trusts the CAs in our KeyStore
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
@@ -134,8 +153,9 @@ class MainActivity : AppCompatActivity() {
 
             //!keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
 
-            keyStore12.load(certInput12, pc.toCharArray())
-            keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
+            // keyStore12.load(certInput12, pc.toCharArray()) // ! crashes with verification error
+            //keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
+            keyStore12.load(certInput12, "cz.corpus.sslpinning".toCharArray())
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
@@ -151,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
-            Log.i(TAG,"[verify] Authenticating client as Alice")
+            Log.i(tag,"[verify] Authenticating client as Alice")
 
             try {
                 val rd = BufferedReader(
@@ -162,15 +182,17 @@ class MainActivity : AppCompatActivity() {
                     Log.d("[verify] SSLCertificatePins", line!!)
                 }
             } catch (e: java.lang.Exception) {
-                Log.d(TAG, "[verify] Authentication InputStream Exception:")
-                e.printStackTrace()
+                Log.d(tag, "[verify] Authentication InputStream Exception:")
+                if (this.inDevelopment()) e.printStackTrace()
+                Sentry.captureException(e)
             } finally {
                 urlConnection.disconnect()
             }
 
         } catch (e: Exception) {
-            Log.d(TAG, "[verify] Verification Exception:")
-            e.printStackTrace()
+            Log.d(tag, "[verify] Verification Exception.")
+            Sentry.captureException(e)
+            System.exit(0)
         }
     }
 
@@ -188,19 +210,19 @@ class MainActivity : AppCompatActivity() {
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: SslError) {
                 when (error.primaryError) {
                     SslError.SSL_UNTRUSTED -> Log.d(
-                        TAG,
+                        tag,
                         "onReceivedSslError: The certificate authority is not trusted." + error.certificate.toString()
                     )
                     SslError.SSL_EXPIRED -> Log.d(
-                        TAG,
+                        tag,
                         "onReceivedSslError: The certificate has expired."
                     )
                     SslError.SSL_IDMISMATCH -> Log.d(
-                        TAG,
+                        tag,
                         "onReceivedSslError: The certificate Hostname mismatch."
                     )
                     SslError.SSL_NOTYETVALID -> Log.d(
-                        TAG,
+                        tag,
                         "onReceivedSslError: The certificate is not yet valid."
                     )
                 }
