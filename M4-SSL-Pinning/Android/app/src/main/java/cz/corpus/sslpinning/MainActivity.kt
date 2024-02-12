@@ -52,7 +52,8 @@ class MainActivity : AppCompatActivity() {
         val rootBeer = RootBeer(this)
         if (rootBeer.isRooted) {
             if (this.inDevelopment()) {
-                Sentry.captureMessage("Debugging on compromised device.")
+                // Sentry.captureMessage("Debugging on compromised device.")
+                // This is currently allowed.
             } else {
                 Sentry.captureMessage("Terminated on compromised device in release mode.")
                 this.finishAndRemoveTask()
@@ -138,6 +139,7 @@ class MainActivity : AppCompatActivity() {
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
             val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
             tmf.init(keyStore)
+
             /*** Client Certificate  */
             val keyStore12 = KeyStore.getInstance("PKCS12")
             val certInput12 = resources.openRawResource(R.raw.alice)
@@ -149,19 +151,15 @@ class MainActivity : AppCompatActivity() {
             val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
 
             //Log.d("CP:", cp.joinToString("."))
-            //Log.d("PC:", pc)
+            //Log.d("PC:", pc) // do not forget this here
 
-
-            //!keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
-
-            // keyStore12.load(certInput12, pc.toCharArray()) // ! crashes with verification error
-            //keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray())
-            keyStore12.load(certInput12, "cz.corpus.sslpinning".toCharArray())
+            //keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray()) // known invalid
+            //keyStore12.load(certInput12, pc.toCharArray()) // wrong password or corrupted file
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
             val kmf = KeyManagerFactory.getInstance(algorithm)
-            kmf.init(keyStore12, null)
+            kmf.init(keyStore12, null) // this keystore has no password?
 
             /*** SSL Connection  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
@@ -192,6 +190,7 @@ class MainActivity : AppCompatActivity() {
 
         } catch (e: Exception) {
             Log.d(tag, "[verify] Verification Exception.")
+            if (this.inDevelopment()) e.printStackTrace()
             Sentry.captureException(e)
             System.exit(0)
         }
