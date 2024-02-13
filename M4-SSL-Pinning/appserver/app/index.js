@@ -80,22 +80,26 @@ app.get('/authenticate', (req, res) => {
 	const cert = req.socket.getPeerCertificate()
   const subject = cert.subject.CN
 
-	if (req.client.authorized) {
-    console.log("Client authorized, should receive a valid JWT!");
-		res.send(`Hello ${cert.subject.CN}, your certificate was issued by ${cert.issuer.CN}!`);
+  // This really does not work (why?) so we're using own validation and error handling (below).
+  // const authorized = req.client.authorized
+  // console.log("Authorized: ", {authorized});
 
-	} else if (cert.subject.CN.indexOf("alice@ctf24.teacloud.net") === -1) {
+  // Validate subject CN
+	if (cert.subject.CN.indexOf("alice@ctf24.teacloud.net") === -1) {
     console.log(`Unknown subject ${subject} in cert`, {cert});
 
-    if (cert.fingerprint.indexOf(pingerprint) === -1 ) {
-      res.status(403)
-          .send(`Sorry ${cert.subject.CN}, your are not welcome here.`);
+    // Validate issuer CN
+    if (cert.issuer.CN.indexOf("ctf24.teacloud.net") === -1) {
+      res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`);
+      return;
     }
 
-	} else {
-    console.log(`Missing client certificate in ${cert}`);
-		res.status(401)
-		   .send(`Sorry, but you need to provide a client certificate to continue.`);
+    // Validate pinned client fingerprint
+    if (cert.fingerprint.indexOf(pingerprint) === -1 ) {
+      res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`);
+      return;
+    }
+
 	}
 
   let r_headers = req.headers;
@@ -106,7 +110,7 @@ app.get('/authenticate', (req, res) => {
 
   if (ua.indexOf('Android') == -1) {
     console.log('User-Agent validation failed.')
-    res.send("Try again (1).")
+    res.status(417).send("Try again (1).")
     return
   }
 
@@ -114,7 +118,7 @@ app.get('/authenticate', (req, res) => {
 
   if (rw.indexOf('cz.corpus.sslpinning') == -1) {
     console.log('X-Requested-With validation failed.')
-    res.send("Try again (2).")
+    res.status(417).send("Try again (2).")
     return
   }
 
@@ -122,7 +126,7 @@ app.get('/authenticate', (req, res) => {
   // check uuid
   if (validate(r_id) === false) {
     console.log('UUID validation failed.')
-    res.send("Try again (3).")
+    res.status(417).send("Try again (3).")
     return
   }
   */
@@ -135,6 +139,7 @@ app.get('/authenticate', (req, res) => {
   res.send('<html><head><title></title><body><h1>Hello hacker.</h1></body>')
 });
 
+// Will deprecate once client certificate authenticated login will be implemented.
 app.get('/hello/:id', (req, res) => {
   
   let r_body = req.body;
