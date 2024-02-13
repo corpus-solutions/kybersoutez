@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace 'cz.corpus.sslpinning'
-    compileSdk 32
+    compileSdk 34
 
     defaultConfig {
         applicationId "cz.corpus.sslpinning"
         minSdk 30
-        targetSdk 32
+        targetSdk 34
         versionCode 1
         versionName "1.0"
 
@@ -31,6 +31,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
+    }
+    lint {
+        baseline = file("lint-baseline.xml")
     }
 }
 

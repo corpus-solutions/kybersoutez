@@ -153,8 +153,7 @@ class MainActivity : AppCompatActivity() {
             //Log.d("CP:", cp.joinToString("."))
             //Log.d("PC:", pc) // do not forget this here
 
-            //keyStore12.load(certInput12, "sslpinning.corpus.cz".toCharArray()) // known invalid
-            //keyStore12.load(certInput12, pc.toCharArray()) // wrong password or corrupted file
+            keyStore12.load(certInput12, pc.toCharArray()) // wrong password or corrupted file
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
