@@ -65,7 +65,7 @@ app.use(function onError(err, req, res, next) {
   res.end(res.sentry + "\n");
 });
 
-app.get('/authenticate', (req, res) => {
+app.get('/authenticate/:id', (req, res) => {
 
   /* Prevent crash on getPeerCertificate() when called over HTTP */
   const isHTTPS = typeof(req.socket.getPeerCertificate)
@@ -103,7 +103,7 @@ app.get('/authenticate', (req, res) => {
 	}
 
   let r_headers = req.headers;
-  //let r_id = req.path.replace('/hello/', '');
+  let r_id = req.path.replace('/authenticate/', '');
 
   // check user agent
   let ua = r_headers['user-agent'];
@@ -122,14 +122,12 @@ app.get('/authenticate', (req, res) => {
     return
   }
 
-  /* TODO: /authenticate/:id in client
   // check uuid
   if (validate(r_id) === false) {
     console.log('UUID validation failed.')
     res.status(417).send("Try again (3).")
     return
   }
-  */
 
   // respond with JWT
   var token = jwt.sign({ flag: "18d51b12-c507-11ee-b350-93bb971b46a7" }, secret)

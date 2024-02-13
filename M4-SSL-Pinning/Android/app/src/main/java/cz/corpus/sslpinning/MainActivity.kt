@@ -164,7 +164,7 @@ class MainActivity : AppCompatActivity() {
             // Create an SSLContext that uses our TrustManager and our KeyManager
             val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
-            val url = URL("https://ctf24.teacloud.net:8890/authenticate") // to work-around SSL unwrapping in Traefik
+            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
 
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
