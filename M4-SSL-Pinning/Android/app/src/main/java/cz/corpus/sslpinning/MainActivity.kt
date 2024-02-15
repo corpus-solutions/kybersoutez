@@ -135,21 +135,21 @@ class MainActivity : AppCompatActivity() {
             val ca: Certificate = cf.generateCertificate(caInput)
             Log.d(tag, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
 
-            // Create a KeyStore containing our trusted CAs
+            // Create a KeyStore containing our trusted CAs from `trusted_roots`
             val keyStoreType = KeyStore.getDefaultType()
-            val keyStore = KeyStore.getInstance(keyStoreType)
-            keyStore.load(null, null)
-            keyStore.setCertificateEntry("ca", ca)
-            Log.d(tag, "[verify] keyStoreType:" + keyStoreType)
+            val keyStore12 = KeyStore.getInstance(keyStoreType)
+            keyStore12.load(null, null)
+            keyStore12.setCertificateEntry("ca", ca)
+            Log.d(tag, "[verify] Root keyStoreType: " + keyStoreType)
 
             // Create a TrustManager that trusts the CAs in our KeyStore
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
             val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
-            tmf.init(keyStore)
+            tmf.init(keyStore12)
 
             /*** Client Certificate  */
-            val keyStore12 = KeyStore.getInstance("PKCS12")
-            val certInput12 = resources.openRawResource(R.raw.alice)
+            val clientKeyStore = KeyStore.getInstance("BKS")
+            val certInput = resources.openRawResource(R.raw.alice)
 
             val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
             val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
@@ -157,13 +157,15 @@ class MainActivity : AppCompatActivity() {
             //Log.d("CP:", cp.joinToString("."))
             //Log.d("PC:", pc) // do not forget this here
 
-            // TODO: FIXME: Throws `PKCS12 key store mac invalid – wrong password or corrupted file`
-            keyStore12.load(certInput12, pc.toCharArray()) // wrong password or corrupted file
+            // TODO: FIXME:
+            // Crashes with: `java.io.IOException: KeyStore integrity check failed.`
+            //clientKeyStore.load(certInput, applicationContext.packageName.toCharArray()) // TODO: FIXME: Use correct password :o))
+            clientKeyStore.load(certInput, pc.toCharArray()) // wrong password or corrupted file
 
             // Create a KeyManager that uses our client cert
             val algorithm = KeyManagerFactory.getDefaultAlgorithm()
             val kmf = KeyManagerFactory.getInstance(algorithm)
-            kmf.init(keyStore12, null) // this keystore has no password?
+            kmf.init(clientKeyStore, pc.toCharArray()) // this keystore has no password?
 
             /*** SSL Connection  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
@@ -182,6 +184,8 @@ class MainActivity : AppCompatActivity() {
                 Log.i(tag,"[error] Server returned HTTP Error " + responseCode.toString())
                 Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
+
+                // TODO: FIXME: Returns Error 500 (probably when certificate is not used)
                 return
             }
 
@@ -192,14 +196,10 @@ class MainActivity : AppCompatActivity() {
                 var line: String?
                 while (rd.readLine().also { line = it } != null) {
                     Log.d("[verify] SSLCertificatePins", line!!)
-
                     val header = urlConnection.getHeaderField("X-Pin-Challenge")
-
                     if (validatePinning(line!!, header, pc)) {
-                        // TODO: Do something with `line` -> convert to JSON and use pins dynamically
                         updateDynamicPins(line!!)
                     }
-
                 }
             } catch (e: java.lang.Exception) {
                 Log.d(tag, "[verify] Authentication InputStream Exception:")
@@ -224,13 +224,13 @@ class MainActivity : AppCompatActivity() {
 
         val gson = Gson()
         var data = gson.fromJson(line.trimIndent(), PinningModel::class.java)
-        println(data.fingerprints)
-        println(data.timestamp)
+        //println(data.fingerprints)
+        //println(data.timestamp)
 
         val certificatePinner = CertificatePinner.Builder()
 
         for (pin in data.fingerprints) {
-            certificatePinner.add("sha256/" + pin.name!!, pin.fingerprint!!)
+            certificatePinner.add(pin.name!!, "sha256/" + pin.fingerprint!!)
         }
 
         val okHttpClient = OkHttpClient.Builder()
