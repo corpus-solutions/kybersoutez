@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity() {
             )
             var line: String?
             while (rd.readLine().also { line = it } != null) {
-                Log.d("SSLCertificatePins", line!!)
+                updateDynamicPins(line!!)
             }
         } catch (e: java.lang.Exception) {
             if (inDevelopment()) e.printStackTrace()
@@ -157,6 +157,7 @@ class MainActivity : AppCompatActivity() {
             //Log.d("CP:", cp.joinToString("."))
             //Log.d("PC:", pc) // do not forget this here
 
+            // TODO: FIXME: Throws `PKCS12 key store mac invalid – wrong password or corrupted file`
             keyStore12.load(certInput12, pc.toCharArray()) // wrong password or corrupted file
 
             // Create a KeyManager that uses our client cert
@@ -168,8 +169,8 @@ class MainActivity : AppCompatActivity() {
             // Create an SSLContext that uses our TrustManager and our KeyManager
             val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
-            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
 
+            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
@@ -178,7 +179,8 @@ class MainActivity : AppCompatActivity() {
             val responseCode = urlConnection.responseCode
 
             if (responseCode != 200) {
-                Log.i(tag,"[verify] HTTP Error " + responseCode.toString())
+                Log.i(tag,"[error] Server returned HTTP Error " + responseCode.toString())
+                Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
                 return
             }
@@ -228,7 +230,7 @@ class MainActivity : AppCompatActivity() {
         val certificatePinner = CertificatePinner.Builder()
 
         for (pin in data.fingerprints) {
-            certificatePinner.add(pin.name!!, pin.fingerprint!!)
+            certificatePinner.add("sha256/" + pin.name!!, pin.fingerprint!!)
         }
 
         val okHttpClient = OkHttpClient.Builder()

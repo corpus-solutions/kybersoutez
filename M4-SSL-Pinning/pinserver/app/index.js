@@ -10,9 +10,7 @@ const app = express()
 //
 
 // This would be preferably externally configurable using env var or Docker/Swarm secret
-const bcrypto = require("bcrypt")
-const crypto_rounds = 14
-const crypto_salt = process.env.SALT || "sslpinning.corpus.cz";
+const crypto_salt = process.env.SALT;
 const http_port = 8888
 
 //
@@ -49,18 +47,20 @@ function getCertificateDetails(certPath) {
   console.log("Fetching certificate from path: " + certPath)
   
   let certData;
+
   try {
     certData = fs.readFileSync(certPath);
   } catch (e) {
     console.error(e);
     return {}
   }
+
+  if (certData == null) return {}
    
   try {
 
-  
     let cert = new node_crypto.X509Certificate(certData)
-
+    
     const timestamp = Date.parse(cert.validTo)/1000
     const fingerprint = Buffer.from(cert.fingerprint256.replaceAll(":", ""), 'hex').toString('base64')
     const subject = cert.subject.replace("CN=", "")
@@ -72,7 +72,7 @@ function getCertificateDetails(certPath) {
     }
 
   } catch (e) {
-    console.error(e);
+    console.error("Caught exception:", e);
     return {}
   }
 }
@@ -101,7 +101,7 @@ app.get('/pin.json', (req, res) => {
   if (typeof(pins.fingerprints) === "undefined") pins.fingerprints = [];
 
   for (const cert of paths) {
-    const certJSON = getCertificateDetails(cert)
+    let certJSON = getCertificateDetails(cert)
     // add only non-empty objects to skip potential error leaks
     if (JSON.stringify(certJSON) !== '{}') pins.fingerprints.push(certJSON)
   }
@@ -109,23 +109,17 @@ app.get('/pin.json', (req, res) => {
   // Add current timestamp
   pins.timestamp = Math.floor(Date.now() / 1000) // number of seconds since Unix epoch
   
+  var hash = node_crypto.createHash('sha256').update(crypto_salt + "$" + JSON.stringify(pins)).digest('base64');
+
   // Sign with a challenge (to be verifiable on the client side using hash+salt)
-  bcrypto.genSalt(crypto_rounds)
-  .then(salt => {
-    return bcrypto.hash(JSON.stringify(pins), salt+':'+crypto_salt)
-  })
-  .then(hash => {
-    return Buffer.from(hash).toString('base64')
-  })
-  .then(challenge => {
-    // To validate the challenge, client must calculate hash of received JSON
-    // The hash in Base64 form must be same as the X-Pin-Challenge, otherwise the pinning should be rejected,
-    res.set('X-Pin-Challenge', challenge)
-    console.log('X-Pin-Challenge: ', challenge)
-    console.log(pins)
-    res.send(pins);
-  })
-  .catch(err => console.error(err.message))
+  
+  // To validate the challenge, client must calculate hash of received JSON
+  // The hash in Base64 form must be same as the X-Pin-Challenge, otherwise the pinning should be rejected,
+  res.set('X-Pin-Challenge', hash)
+  console.log('X-Pin-Challenge: ', hash)
+  console.log(pins)
+  res.send(pins);
+  
 });
 
 // Serve preferably over HTTPS only (SSL will be unwrapped using Traefik router)

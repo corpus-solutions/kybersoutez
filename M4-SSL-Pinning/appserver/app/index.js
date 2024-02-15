@@ -138,7 +138,7 @@ app.get('/authenticate/:id', (req, res) => {
 });
 
 // Will deprecate once client certificate authenticated login will be implemented.
-app.get('/hello/:id', (req, res) => {
+app.get('/hello/:id', function mainHandler(req, res) {
   
   let r_body = req.body;
   let r_headers = req.headers;
