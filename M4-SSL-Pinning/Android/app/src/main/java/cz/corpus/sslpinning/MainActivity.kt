@@ -9,12 +9,19 @@ import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
+import com.google.gson.Gson
 import com.scottyab.rootbeer.RootBeer
+import io.sentry.Sentry
+import okhttp3.CertificatePinner
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.lsposed.lsparanoid.Obfuscate
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URL
 import java.security.KeyStore
+import java.security.MessageDigest
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -23,8 +30,6 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
-import io.sentry.Sentry
-import org.lsposed.lsparanoid.Obfuscate
 
 @Obfuscate
 class MainActivity : AppCompatActivity() {
@@ -118,12 +123,14 @@ class MainActivity : AppCompatActivity() {
             val cf = CertificateFactory.getInstance("X.509")
 
             val caInput: InputStream
+            val resource: Int
 
-            if (this.inDevelopment()) {
-                caInput = resources.openRawResource(R.raw.trusted_roots_dev)
-            } else {
-                caInput = resources.openRawResource(R.raw.trusted_roots)
-            }
+            if (this.inDevelopment())
+                resource = R.raw.trusted_roots_dev
+            else
+                resource = R.raw.trusted_roots
+
+            caInput = resources.openRawResource(resource)
 
             val ca: Certificate = cf.generateCertificate(caInput)
             Log.d(tag, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
@@ -143,9 +150,6 @@ class MainActivity : AppCompatActivity() {
             /*** Client Certificate  */
             val keyStore12 = KeyStore.getInstance("PKCS12")
             val certInput12 = resources.openRawResource(R.raw.alice)
-            //keyStore12.load(certInput12, applicationContext.packageName.toCharArray())
-
-            // Log.d("PN:", applicationContext.packageName) // cz.corpus.sslpinning
 
             val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
             val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
@@ -171,6 +175,14 @@ class MainActivity : AppCompatActivity() {
 
             Log.i(tag,"[verify] Authenticating client as Alice")
 
+            val responseCode = urlConnection.responseCode
+
+            if (responseCode != 200) {
+                Log.i(tag,"[verify] HTTP Error " + responseCode.toString())
+                // This maybe should call exit or drop an alert
+                return
+            }
+
             try {
                 val rd = BufferedReader(
                     InputStreamReader(urlConnection.inputStream)
@@ -178,6 +190,14 @@ class MainActivity : AppCompatActivity() {
                 var line: String?
                 while (rd.readLine().also { line = it } != null) {
                     Log.d("[verify] SSLCertificatePins", line!!)
+
+                    val header = urlConnection.getHeaderField("X-Pin-Challenge")
+
+                    if (validatePinning(line!!, header, pc)) {
+                        // TODO: Do something with `line` -> convert to JSON and use pins dynamically
+                        updateDynamicPins(line!!)
+                    }
+
                 }
             } catch (e: java.lang.Exception) {
                 Log.d(tag, "[verify] Authentication InputStream Exception:")
@@ -193,6 +213,58 @@ class MainActivity : AppCompatActivity() {
             Sentry.captureException(e)
             System.exit(0)
         }
+    }
+
+
+    private fun updateDynamicPins(line: String) {
+
+        // TODO: Update dynamic pins for connections to be used or rather pass further to prevent keeping this in memory?
+
+        val gson = Gson()
+        var data = gson.fromJson(line.trimIndent(), PinningModel::class.java)
+        println(data.fingerprints)
+        println(data.timestamp)
+
+        val certificatePinner = CertificatePinner.Builder()
+
+        for (pin in data.fingerprints) {
+            certificatePinner.add(pin.name!!, pin.fingerprint!!)
+        }
+
+        val okHttpClient = OkHttpClient.Builder()
+            .certificatePinner(certificatePinner.build())
+            .build()
+
+        // TODO: Do something with the okHttpClient (call /authenticate/:id) and put result into the WebView
+
+        val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+
+        val request: Request = Request.Builder()
+            .url(url)
+            .build()
+
+        okHttpClient.newCall(request).execute().use {
+            response ->
+            {
+                Log.d(tag, response.body?.string()!!)
+            }
+        }
+    }
+    private fun hash(data: String): String {
+        val bytes = data.toString().toByteArray()
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(bytes)
+        return digest.fold("", { str, it -> str + "%02x".format(it) })
+    }
+
+    fun validatePinning(json:String, header:String, pc: String): Boolean {
+        // TODO: Validate pinning header by calculating hash + salt
+
+        val inHash = hash(pc + "$" + json)
+        Log.d("validatePinning", "TODO: Compare hashes: "+inHash + " and "+header)
+
+        // TODO: Return false if hashes are not the same
+        return true
     }
 
     private fun setupWebView() {
