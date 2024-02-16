@@ -17,6 +17,7 @@ import io.sentry.Sentry
 import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.ByteString.Companion.decodeHex
 import org.lsposed.lsparanoid.Obfuscate
 import java.io.BufferedReader
 import java.io.InputStream
@@ -24,6 +25,7 @@ import java.io.InputStreamReader
 import java.net.URL
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
@@ -48,11 +50,11 @@ class MainActivity : AppCompatActivity() {
         /** This is stub for testing Sentry implementation.
         // waiting for view to draw to better represent a captured error with a screenshot
         findViewById<android.view.View>(android.R.id.content).viewTreeObserver.addOnGlobalLayoutListener {
-          try {
-            throw Exception("This app uses Sentry! :)")
-          } catch (e: Exception) {
-            Sentry.captureException(e)
-          }
+        try {
+        throw Exception("This app uses Sentry! :)")
+        } catch (e: Exception) {
+        Sentry.captureException(e)
+        }
         }*/
 
         setContentView(R.layout.activity_main)
@@ -97,6 +99,12 @@ class MainActivity : AppCompatActivity() {
         setupWebView()
     }
 
+    private fun getPC():String {
+        val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
+        val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
+        return pc
+    }
+
     /**
      * Fetch pins using public resource (ssl-pinned)
      */
@@ -121,6 +129,13 @@ class MainActivity : AppCompatActivity() {
             )
             var line: String?
             while (rd.readLine().also { line = it } != null) {
+                Log.d("[verify] SSLCertificatePins", line!!)
+                val header = urlConnection.getHeaderField("X-Pin-Challenge")
+                if (header !== null && validatePinning(line!!, header, getPC())) {
+                    updateDynamicPins(line!!)
+                } else {
+                    Log.d(tag, "Pinning header not found.")
+                }
                 updateDynamicPins(line!!)
             }
         } catch (e: java.lang.Exception) {
@@ -136,62 +151,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun verifyConnection() {
+
+        val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+
+        val cf = CertificateFactory.getInstance("X.509")
+        val caInput: InputStream
+        val resource: Int
+
+        /*** Select resource based on runtime environment */
+        if (this.inDevelopment())
+            resource = R.raw.trusted_roots_dev
+        else
+            resource = R.raw.trusted_roots
+
+        caInput = resources.openRawResource(resource)
+
+        /*** Get CA certificate */
+        val ca: Certificate = cf.generateCertificate(caInput)
+        Log.d(tag, "[verify:RootCA] ca=" + (ca as X509Certificate).getSubjectDN())
+
+        /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
+        val keyStoreType = KeyStore.getDefaultType()
+        val keyStore12 = KeyStore.getInstance(keyStoreType)
+
+        try {
+            keyStore12.load(caInput, null)
+        } finally {
+            caInput.close()
+        }
+
+        keyStore12.setCertificateEntry("ca", ca)
+        Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
+
+        // Create a TrustManager that trusts the CAs in our KeyStore
+        val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
+        val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
+        tmf.init(keyStore12)
+
+        /*** Client Certificate  */
+        val pc = getPC()
+        val clientKeyStore = KeyStore.getInstance("BKS")
+        val certInput = resources.openRawResource(R.raw.alice)
+
+        try {
+            clientKeyStore.load(certInput, pc.toCharArray())
+        } finally {
+            certInput.close();
+        }
+
         try {
 
-            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
-
-            /*** CA Certificate  */
-            val cf = CertificateFactory.getInstance("X.509")
-
-            val caInput: InputStream
-            val resource: Int
-
-            if (this.inDevelopment())
-                resource = R.raw.trusted_roots_dev
-            else
-                resource = R.raw.trusted_roots
-
-            caInput = resources.openRawResource(resource)
-
-            val ca: Certificate = cf.generateCertificate(caInput)
-            Log.d(tag, "[verify:RootCA] ca=" + (ca as X509Certificate).getSubjectDN())
-
-            // Create a KeyStore containing our trusted CAs from `trusted_roots`
-            val keyStoreType = KeyStore.getDefaultType()
-            val keyStore12 = KeyStore.getInstance(keyStoreType)
-            keyStore12.load(null, null)
-            keyStore12.setCertificateEntry("ca", ca)
-            Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
-
-            // Create a TrustManager that trusts the CAs in our KeyStore
-            val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
-            val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
-            tmf.init(keyStore12)
-
-            /*** Client Certificate  */
-            val clientKeyStore = KeyStore.getInstance("BKS")
-            val certInput = resources.openRawResource(R.raw.alice)
-
-            val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
-            val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
-
-            //Log.d("CP:", cp.joinToString("."))
-            //Log.d("PC:", pc) // do not forget this here
-
-            // TODO: FIXME:
-            // Crashes with: `java.io.IOException: KeyStore integrity check failed.`
-            //clientKeyStore.load(certInput, applicationContext.packageName.toCharArray()) // TODO: FIXME: Use correct password :o))
-            clientKeyStore.load(certInput, pc.toCharArray()) // wrong password or corrupted file
-
             // Create a KeyManager that uses our client cert
-            val algorithm = KeyManagerFactory.getDefaultAlgorithm()
-            val kmf = KeyManagerFactory.getInstance(algorithm)
+            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
             kmf.init(clientKeyStore, pc.toCharArray()) // this keystore has no password?
 
-            /*** SSL Connection  */
+            /*** SSL Connection (v1)  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
-            val context = SSLContext.getInstance("TLSv1.3")
-            context.init(kmf.keyManagers, tmf.trustManagers, null)
+            val context = SSLContext.getInstance("SSL") // TLSv1.2, TLSv1.3
+            context.init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
 
             /*** HttpsURLConnection with custom socket factory */
             val conn = url.openConnection() as HttpsURLConnection
@@ -202,7 +219,7 @@ class MainActivity : AppCompatActivity() {
 
             var string: String? = null
             while (bufferedreader.readLine().also { string = it } != null) {
-            println("Received $string")
+                println("Received $string")
             }
 
             // Connection to `appserver`
@@ -228,11 +245,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 var line: String?
                 while (rd.readLine().also { line = it } != null) {
-                    Log.d("[verify] SSLCertificatePins", line!!)
-                    val header = urlConnection.getHeaderField("X-Pin-Challenge")
-                    if (validatePinning(line!!, header, pc)) {
-                        updateDynamicPins(line!!)
-                    }
+                    Log.d("[verify] Response", line!!)
                 }
             } catch (e: java.lang.Exception) {
                 Log.d(tag, "[verify] Authentication InputStream Exception:")
@@ -279,9 +292,9 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         okHttpClient.newCall(request).execute().use {
-            response ->
+                response ->
             {
-                Log.d(tag, response.body?.string()!!)
+                Log.d("updateDynamicPins", response.body?.string()!!)
             }
         }
     }
@@ -292,14 +305,22 @@ class MainActivity : AppCompatActivity() {
         return digest.fold("", { str, it -> str + "%02x".format(it) })
     }
 
+    /***
+     * Validates pinning header by calculating hash + salt.
+     * Returns false if hashes are not the same.
+     */
+
+    fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
     fun validatePinning(json:String, header:String, pc: String): Boolean {
-        // TODO: Validate pinning header by calculating hash + salt
-
+        val deBase = Base64.getDecoder().decode(header)
         val inHash = hash(pc + "$" + json)
-        Log.d("validatePinning", "TODO: Compare hashes: "+inHash + " and "+header)
-
-        // TODO: Return false if hashes are not the same
-        return true
+        val inHashEncoded = Base64.getEncoder().encode(inHash.toByteArray())
+        val headerHex = deBase.toHex()
+        if (inHash.equals(headerHex)) {
+            return true
+        }
+        Log.d("validatePinning", "FAILED")
+        return false
     }
 
     private fun setupWebView() {
