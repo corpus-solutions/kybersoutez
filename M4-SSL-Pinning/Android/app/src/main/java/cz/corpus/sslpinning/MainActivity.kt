@@ -47,16 +47,6 @@ class MainActivity : AppCompatActivity() {
         setTheme(R.style.Theme_SSLPinning)
         super.onCreate(savedInstanceState)
 
-        /** This is stub for testing Sentry implementation.
-        // waiting for view to draw to better represent a captured error with a screenshot
-        findViewById<android.view.View>(android.R.id.content).viewTreeObserver.addOnGlobalLayoutListener {
-        try {
-        throw Exception("This app uses Sentry! :)")
-        } catch (e: Exception) {
-        Sentry.captureException(e)
-        }
-        }*/
-
         setContentView(R.layout.activity_main)
         this.title = "CTF.2024"
 
@@ -77,21 +67,21 @@ class MainActivity : AppCompatActivity() {
         val rootBeer = RootBeer(this)
         if (rootBeer.isRooted) {
             if (this.inDevelopment()) {
-                // Sentry.captureMessage("Debugging on compromised device.")
+                Sentry.captureMessage("Debugging on compromised device.")
                 // This is currently allowed.
             } else {
                 Sentry.captureMessage("Terminated on compromised device in release mode.")
+                Log.d("SSLPinning", "We found indication of root. Application will be terminated.")
                 this.finishAndRemoveTask()
                 System.exit(0)
             }
-            Log.d("SSLPinning", "We found indication of root. Application will be terminated.")
         } else {
             Log.d("SSLPinning", "We didn't find indication of root or this is a Debug build.")
             Sentry.captureMessage("Started on valid device.")
         }
 
         Thread {
-            fetchPins()
+            // fetchPins() // this already works, verify is broken now
             verifyConnection()
             //runOnUiThread {}
         }.start()
@@ -136,7 +126,6 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Log.d(tag, "Pinning header not found.")
                 }
-                updateDynamicPins(line!!)
             }
         } catch (e: java.lang.Exception) {
             if (inDevelopment()) e.printStackTrace()
@@ -172,32 +161,29 @@ class MainActivity : AppCompatActivity() {
 
         /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
         val keyStoreType = KeyStore.getDefaultType()
-        val keyStore12 = KeyStore.getInstance(keyStoreType)
-
-        try {
-            keyStore12.load(caInput, null)
-        } finally {
-            caInput.close()
-        }
-
-        keyStore12.setCertificateEntry("ca", ca)
         Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
+
+        val keyStore = KeyStore.getInstance(keyStoreType)
+        keyStore.load(null, null)
+
+        keyStore.setCertificateEntry("ca", ca)
+
 
         // Create a TrustManager that trusts the CAs in our KeyStore
         val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
         val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
-        tmf.init(keyStore12)
+        tmf.init(keyStore)
 
         /*** Client Certificate  */
         val pc = getPC()
         val clientKeyStore = KeyStore.getInstance("BKS")
         val certInput = resources.openRawResource(R.raw.alice)
 
-        try {
+        //try {
             clientKeyStore.load(certInput, pc.toCharArray())
-        } finally {
-            certInput.close();
-        }
+        //} finally {
+        //    certInput.close();
+        //}
 
         try {
 
@@ -207,7 +193,7 @@ class MainActivity : AppCompatActivity() {
 
             /*** SSL Connection (v1)  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
-            val context = SSLContext.getInstance("SSL") // TLSv1.2, TLSv1.3
+            val context = SSLContext.getInstance("TLS") // TLSv1.2, TLSv1.3
             context.init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
 
             /*** HttpsURLConnection with custom socket factory */
@@ -219,7 +205,7 @@ class MainActivity : AppCompatActivity() {
 
             var string: String? = null
             while (bufferedreader.readLine().also { string = it } != null) {
-                println("Received $string")
+                Log.d("[verify] Response 1", ": $string")
             }
 
             // Connection to `appserver`
@@ -245,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 var line: String?
                 while (rd.readLine().also { line = it } != null) {
-                    Log.d("[verify] Response", line!!)
+                    Log.d("[verify] Response 2", ": $line")
                 }
             } catch (e: java.lang.Exception) {
                 Log.d(tag, "[verify] Authentication InputStream Exception:")
@@ -279,12 +265,15 @@ class MainActivity : AppCompatActivity() {
             certificatePinner.add(pin.name!!, "sha256/" + pin.fingerprint!!)
         }
 
+        // Keep for later
+        //return
+
+        // This seems to be missing SSLFactory
         val okHttpClient = OkHttpClient.Builder()
             .certificatePinner(certificatePinner.build())
             .build()
 
-        // TODO: Do something with the okHttpClient (call /authenticate/:id) and put result into the WebView
-
+        // Do something with the okHttpClient (call /authenticate/:id) and put result into the WebView
         val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
 
         val request: Request = Request.Builder()
@@ -294,7 +283,11 @@ class MainActivity : AppCompatActivity() {
         okHttpClient.newCall(request).execute().use {
                 response ->
             {
-                Log.d("updateDynamicPins", response.body?.string()!!)
+                Log.d("PinnedResponse", response.body?.string()!!)
+                // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
+                //val myWebView: WebView = findViewById(R.id.webview)
+                //myWebView.loadData(response.body?.string()!!, "text/html; charset=utf-8", "UTF-8")
+
             }
         }
     }
@@ -316,11 +309,7 @@ class MainActivity : AppCompatActivity() {
         val inHash = hash(pc + "$" + json)
         val inHashEncoded = Base64.getEncoder().encode(inHash.toByteArray())
         val headerHex = deBase.toHex()
-        if (inHash.equals(headerHex)) {
-            return true
-        }
-        Log.d("validatePinning", "FAILED")
-        return false
+        return if (inHash.equals(headerHex)) true else false
     }
 
     private fun setupWebView() {
@@ -362,10 +351,3 @@ class MainActivity : AppCompatActivity() {
 
 // https://community.letsencrypt.org/t/certificate-is-not-trusted-on-android/120061
 // Using cross-signed CA certificate in `trusted_roots` from https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem.txt
-
-// Dynamic Pinning: https://ssl.thinx.cloud/pin.json
-
-// TODO:
-// 1. Fetch certificate list from URL above
-// 2. Potentially use OkHttp and CertificatePinner (https://www.netguru.com/blog/android-certificate-pinning)
-
