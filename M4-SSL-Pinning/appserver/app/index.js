@@ -7,31 +7,34 @@
 // Dependencies
 //
 
+// Mandatory
 const express = require('express')
 const fs = require('fs')
 const https = require('https')
 const path = require('path')
 const jwt = require('jsonwebtoken')
+const { validate } = require('uuid')
+
+// Monitoring and Profiling
 const Sentry = require('@sentry/node')
-import { ProfilingIntegration } from "@sentry/profiling-node";
-const { v4: uuidv4, validate } = require('uuid')
 
 //
 // Constants
 //
 
-console.log("appserver-v1.1.4");
+const version = require(__dirname + '/package.json').version
+console.log(`appserver-v${version}`)
 
-const http_port = 8889
+const http_port = 8889 // this is only a fallback port
 const https_port = 8890
 
 const opts = {
-  key: fs.readFileSync(path.join(__dirname, '/certs/server_key.pem')),
-  cert: fs.readFileSync(path.join(__dirname, '/certs/server_cert.pem')),
+  key: fs.readFileSync(path.resolve(__dirname + '/certs/', 'server_key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname + '/certs/', 'server_cert.pem')),
   requestCert: true,
   rejectUnauthorized: false, // so we can do own error handling
   ca: [
-    fs.readFileSync(path.join(__dirname, '/certs/server_ca.pem'))
+    fs.readFileSync(path.resolve(__dirname + '/certs/', 'server_ca.pem'))
   ]
 };
 
@@ -41,7 +44,7 @@ const flagOne = "1efcec4a-ca7f-11ee-b6f4-2fd9776d2810"
 const secret = "NDc1MjQxNTQ1NTRjNTU0YTQ5MjA0YjIwNWFjZDUzNGJjMTRlY2QyMDQ0NTI1NTQ4Yzk0ODRmMjA0NjRjNDE0NzU1MjE="
 
 // This pins fingerprint in order to prevent using any other client certificate
-const pingerprint = 'AB:6B:D9:E8:9B:88:F8:C0:9F:BD:54:77:AF:67:05:C6:27:F4:4D:C8';
+const pingerprint = 'AB:6B:D9:E8:9B:88:F8:C0:9F:BD:54:77:AF:67:05:C6:27:F4:4D:C8'
 
 //
 // The Code
@@ -56,7 +59,6 @@ Sentry.init({
     new Sentry.Integrations.Http({ tracing: true }),
     // enable Express.js middleware tracing
     new Sentry.Integrations.Express({ app }),
-    new ProfilingIntegration(),
   ],
   // Performance Monitoring
   tracesSampleRate: 1.0, //  Capture 100% of the transactions
@@ -65,15 +67,15 @@ Sentry.init({
 });
 
 // The request handler must be the first middleware on the app
-app.use(Sentry.Handlers.requestHandler());
+app.use(Sentry.Handlers.requestHandler())
 
 // TracingHandler creates a trace for every incoming request
-app.use(Sentry.Handlers.tracingHandler());
+app.use(Sentry.Handlers.tracingHandler())
 
 app.use(express.json())
 
 // The error handler must be registered before any other error middleware and after all controllers
-app.use(Sentry.Handlers.errorHandler());
+app.use(Sentry.Handlers.errorHandler())
 
 // Optional fallthrough error handler
 app.use(function onError(err, req, res, next) {
@@ -89,9 +91,9 @@ app.get('/authenticate/:id', (req, res) => {
   /* Prevent crash on getPeerCertificate() when called over HTTP */
   const isHTTPS = typeof (req.socket.getPeerCertificate)
   if (isHTTPS !== "function") {
-    console.log("Typeof socket is:", isHTTPS);
-    console.log("Socket:", req.socket);
-    res.status(415).send('Peer certificate is required. Use HTTPS.');
+    console.log("Typeof socket is:", isHTTPS)
+    console.log("Socket:", req.socket)
+    res.status(415).send('Peer certificate is required. Use HTTPS.')
     return;
   }
 
@@ -116,24 +118,24 @@ app.get('/authenticate/:id', (req, res) => {
 
   // Validate subject CN
   if (cert.subject.CN.indexOf("alice@ctf24.teacloud.net") === -1) {
-    console.log(`Unknown subject ${subject} in cert`, { cert });
+    console.log(`Unknown subject ${subject} in cert`, { cert })
 
     // Validate issuer CN
     if (cert.issuer.CN.indexOf("ctf24.teacloud.net") === -1) {
-      res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`);
+      res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
       return;
     }
 
     // Validate pinned client fingerprint
     if (cert.fingerprint.indexOf(pingerprint) === -1) {
-      res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`);
+      res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
       return;
     }
 
   }
 
-  let r_headers = req.headers;
-  let r_id = req.path.replace('/authenticate/', '');
+  let r_headers = req.headers
+  let r_id = req.path.replace('/authenticate/', '')
 
   // check user agent
   let ua = r_headers['user-agent'];
@@ -170,9 +172,9 @@ app.get('/authenticate/:id', (req, res) => {
 // Will deprecate once client certificate authenticated login will be implemented.
 app.get('/hello/:id', function mainHandler(req, res) {
 
-  let r_body = req.body;
-  let r_headers = req.headers;
-  let r_id = req.path.replace('/hello/', '');
+  let r_body = req.body
+  let r_headers = req.headers
+  let r_id = req.path.replace('/hello/', '')
 
   console.log("GET", { r_body, r_headers, r_id })
 
@@ -190,7 +192,7 @@ app.get('/hello/:id', function mainHandler(req, res) {
   */
 
   // check user agent
-  let ua = r_headers['user-agent'];
+  let ua = r_headers['user-agent']
 
   if (ua.indexOf('Android') == -1) {
     console.log('User-Agent validation failed.')
@@ -220,17 +222,19 @@ app.get('/hello/:id', function mainHandler(req, res) {
   res.send('<html><head><title></title><body><h1>Hello hacker.</h1><span style="color:white;" id="flagOne">' + flagOne + '</span></body>')
 })
 
+/*
 app.listen(http_port, () => {
   console.log(`HTTP server started on port ${http_port}`)
 })
+*/
 
 https.createServer(opts, app).listen(https_port, () => {
-  console.log(`HTTPS server started on port ${https_port}`);
+  console.log(`HTTPS server started on port ${https_port}`)
 });
 
 // DEPRECATED:
 app.get("/debug-sentry", function mainHandler(req, res) {
-  throw new Error("Test Sentry error!");
+  throw new Error("Test Sentry error!")
 });
 
 
