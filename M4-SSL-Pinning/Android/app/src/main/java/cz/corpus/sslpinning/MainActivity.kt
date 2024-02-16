@@ -8,6 +8,8 @@ import android.util.Log
 import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.scottyab.rootbeer.RootBeer
@@ -29,7 +31,9 @@ import java.util.*
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
+
 
 @Obfuscate
 class MainActivity : AppCompatActivity() {
@@ -54,6 +58,20 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         this.title = "CTF.2024"
 
+        val button = findViewById<Button>(R.id.retry)
+
+        button.setOnClickListener {
+            Toast.makeText(this@MainActivity, "Retrying...", Toast.LENGTH_SHORT)
+                .show()
+            Thread {
+                verifyConnection()
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Finished", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }.start()
+        }
+
         val rootBeer = RootBeer(this)
         if (rootBeer.isRooted) {
             if (this.inDevelopment()) {
@@ -73,7 +91,7 @@ class MainActivity : AppCompatActivity() {
         Thread {
             fetchPins()
             verifyConnection()
-            runOnUiThread {}
+            //runOnUiThread {}
         }.start()
 
         setupWebView()
@@ -119,6 +137,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun verifyConnection() {
         try {
+
+            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+
             /*** CA Certificate  */
             val cf = CertificateFactory.getInstance("X.509")
 
@@ -133,14 +154,14 @@ class MainActivity : AppCompatActivity() {
             caInput = resources.openRawResource(resource)
 
             val ca: Certificate = cf.generateCertificate(caInput)
-            Log.d(tag, "[verify] ca=" + (ca as X509Certificate).getSubjectDN())
+            Log.d(tag, "[verify:RootCA] ca=" + (ca as X509Certificate).getSubjectDN())
 
             // Create a KeyStore containing our trusted CAs from `trusted_roots`
             val keyStoreType = KeyStore.getDefaultType()
             val keyStore12 = KeyStore.getInstance(keyStoreType)
             keyStore12.load(null, null)
             keyStore12.setCertificateEntry("ca", ca)
-            Log.d(tag, "[verify] Root keyStoreType: " + keyStoreType)
+            Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
 
             // Create a TrustManager that trusts the CAs in our KeyStore
             val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
@@ -172,7 +193,19 @@ class MainActivity : AppCompatActivity() {
             val context = SSLContext.getInstance("TLSv1.3")
             context.init(kmf.keyManagers, tmf.trustManagers, null)
 
-            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+            /*** HttpsURLConnection with custom socket factory */
+            val conn = url.openConnection() as HttpsURLConnection
+            conn.sslSocketFactory = context.socketFactory
+            val inputstream = conn.inputStream
+            val inputstreamreader = InputStreamReader(inputstream)
+            val bufferedreader = BufferedReader(inputstreamreader)
+
+            var string: String? = null
+            while (bufferedreader.readLine().also { string = it } != null) {
+            println("Received $string")
+            }
+
+            // Connection to `appserver`
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
@@ -185,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                 Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
 
-                // TODO: FIXME: Returns Error 500 (probably when certificate is not used)
+                // TODO: FIXME: Returns Error 500 (probably when certificate is not used – see server log)
                 return
             }
 
