@@ -170,11 +170,11 @@ app.get('/authenticate/:id', (req, res) => {
   }
 
   // respond with JWT
-  var token = jwt.sign({ flagTwo: "18d51b12-c507-11ee-b350-93bb971b46a7", uuid: r_id }, secret)
+  var token = jwt.sign({ flag: flagTwo, uuid: r_id }, secret)
   res.set('Authorization', 'Bearer ' + Buffer.from(token, 'utf-8'))
 
   // HTML contents is not important
-  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find flags hidden in this app’s authentication flow.</p><span style="color:white;" id="flagOne">' + flagOne + '</span></body>')
+  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find flags hidden in this app’s authentication flow.</p></body>')
 });
 
 https.createServer(opts, app).listen(https_port, () => {

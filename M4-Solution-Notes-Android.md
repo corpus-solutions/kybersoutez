@@ -37,6 +37,8 @@ Mobilní aplikace se připojuje na neznámý endpoint a posílá neznámé auten
 
 3. Ve VM uvnitř VirtualBoxu je potřeba nainstalovat také Oracle Virtual Box Extensions (pustit `autorun.sh` na připojeném svazku a restartovat) - jinak není možné používat schránku a sdílené složky.
 
+4. Pokud používáme mobilní telefon místo emulátoru, je třeba na něm zapnout Vývojářský režim (poklepáním na číslo verze systému) a následně Ladění USB (a při prvním připojení potvrdit otisk počítače).
+
 ### Jak opravit nefunkční instalaci `objection`
 
 Kvůli změně v GitHub API vrací chybu řádek:
