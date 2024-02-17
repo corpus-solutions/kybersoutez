@@ -69,12 +69,12 @@ class MainActivity : AppCompatActivity() {
                 // This is currently allowed.
             } else {
                 Sentry.captureMessage("Terminated on compromised device in release mode.")
-                Log.d("SSLPinning", "We found indication of root. Application will be terminated.")
+                // We found indication of root. Application will be terminated.
                 this.finishAndRemoveTask()
                 System.exit(0)
             }
         } else {
-            Log.d("SSLPinning", "We didn't find indication of root or this is a Debug build.")
+            // We didn't find indication of root or this is a Debug build.
             Sentry.captureMessage("Started on valid device.")
         }
 
@@ -115,7 +115,6 @@ class MainActivity : AppCompatActivity() {
             )
             var line: String?
             while (rd.readLine().also { line = it } != null) {
-                Log.d("[fetch] SSLCertificatePins", line!!)
                 val header = urlConnection.getHeaderField("X-Pin-Challenge")
                 if (header !== null && validatePinning(line!!, header, getPC())) {
                     updateDynamicPins(line!!)
@@ -152,11 +151,9 @@ class MainActivity : AppCompatActivity() {
 
         /*** Get CA certificate */
         val ca: Certificate = cf.generateCertificate(caInput)
-        //Log.d(tag, "[authenticate] RootCA=" + (ca as X509Certificate).getSubjectDN())
 
         /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
         val keyStoreType = KeyStore.getDefaultType()
-        //Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
 
         val keyStore = KeyStore.getInstance(keyStoreType)
         keyStore.load(null, null)
@@ -196,7 +193,7 @@ class MainActivity : AppCompatActivity() {
             var string: String? = null
             while (bufferedreader.readLine().also { string = it } != null) {
                 // Should return I'm a teapot - seems to be not authenticated.
-                Log.d("[authenticate]", "Response: $string")
+                //Log.d("[authenticate]", "Response: $string")
             }
 
             Log.i("[authenticate]","Authenticating client as Alice")
@@ -225,12 +222,10 @@ class MainActivity : AppCompatActivity() {
                 Thread {
                     runOnUiThread {
                         val line = rd.readLine()
-                        Log.d("[authenticate]", " Response 2: $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
                         myWebView.loadData(Base64.getEncoder().encodeToString(line.toByteArray(Charsets.UTF_8)), "text/html; charset=utf-8", "base64")
                     }
                 }.start()
                 val header = urlConnection.getHeaderField("Authorization")
-                Log.d("[JWT]", ": $header") // REMOVE IN PRODUCTION
             } catch (e: java.lang.Exception) {
                 Log.e(tag, "[verify] Authentication InputStream Exception:")
                 if (this.inDevelopment()) e.printStackTrace()
@@ -285,7 +280,7 @@ class MainActivity : AppCompatActivity() {
         okHttpClient.newCall(request).execute().use {
                 response ->
             {
-                Log.d("PinnedResponse", response.body?.string()!!)
+                //Log.d("PinnedResponse", response.body?.string()!!)
                 // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
                 val myWebView: WebView = findViewById(R.id.webview)
                 myWebView.loadData(response.body!!.string()!!, "text/html; charset=utf-8", "UTF-8")
@@ -309,19 +304,12 @@ class MainActivity : AppCompatActivity() {
     fun validatePinning(json:String, header:String, pc: String): Boolean {
         val deBase = Base64.getDecoder().decode(header)
         val inHash = hash(pc + "$" + json)
-        val inHashEncoded = Base64.getEncoder().encode(inHash.toByteArray())
         val headerHex = deBase.toHex()
-        Log.d(tag, "Compare inHash: "+inHash+" with headerHex: "+headerHex)
         return if (inHash.equals(headerHex)) true else false
     }
 
     private fun setupWebView() {
         val myWebView: WebView = findViewById(R.id.webview)
-
-        // This should use HttpsURLConnection with client certificate instead (old variant)
-        //val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
-
-        //myWebView.loadUrl(url)
 
         myWebView.setWebViewClient(object : WebViewClient() {
 

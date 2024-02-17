@@ -14,7 +14,7 @@
 #-renamesourcefileattribute SourceFile
 
 #
-# Based on app/build/putput/mapping/release/missing_rules.txt:
+# Based on app/build/output/mapping/release/missing_rules.txt:
 #
 
 -keepclassmembers class android.content.pm.PackageManager {

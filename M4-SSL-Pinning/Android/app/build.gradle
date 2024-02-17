@@ -13,8 +13,8 @@ android {
         applicationId "cz.corpus.sslpinning"
         minSdk 30
         targetSdk 34
-        versionCode 3
-        versionName "1.1.8"
+        versionCode 42
+        versionName "1.1.9"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -22,6 +22,7 @@ android {
     buildTypes {
         release {
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -56,7 +57,7 @@ sentry {
 
     // this will upload your source code to Sentry to show it as part of the stack traces
     // disable if you don't want to expose your sources
-    includeSourceContext = true
+    includeSourceContext = false
 }
 
 lsparanoid {
