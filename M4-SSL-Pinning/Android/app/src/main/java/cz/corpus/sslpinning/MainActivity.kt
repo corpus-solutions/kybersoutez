@@ -227,10 +227,26 @@ class MainActivity : AppCompatActivity() {
                 val rd = BufferedReader(
                     InputStreamReader(urlConnection.inputStream)
                 )
-                var line: String?
+
+                val myWebView: WebView = findViewById(R.id.webview)
+                Thread {
+                    runOnUiThread {
+                        val line = rd.readLine()
+                        Log.d("[verify] Response 2", ": $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
+                        myWebView.loadData(line, "text/html; charset=utf-8", "UTF-8")
+                    }
+                }.start()
+                /*
                 while (rd.readLine().also { line = it } != null) {
-                    Log.d("[verify] Response 2", ": $line")
-                }
+                    Log.d("[verify] Response 2", ": $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
+                    Thread {
+                        runOnUiThread {
+                            myWebView.loadData(line!!, "text/html; charset=utf-8", "UTF-8")
+                        }
+                    }.start()
+                }*/
+                val header = urlConnection.getHeaderField("Authorization")
+                Log.d("[JWT]", ": $header") // REMOVE IN PRODUCTION
             } catch (e: java.lang.Exception) {
                 Log.e(tag, "[verify] Authentication InputStream Exception:")
                 if (this.inDevelopment()) e.printStackTrace()
@@ -319,7 +335,7 @@ class MainActivity : AppCompatActivity() {
         val myWebView: WebView = findViewById(R.id.webview)
 
         // This should use HttpsURLConnection with client certificate instead (old variant)
-        val url = "https://ctf24.teacloud.net:8090/hello/" + UUID.randomUUID().toString()
+        val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
 
         myWebView.loadUrl(url)
 
