@@ -17,7 +17,6 @@ import io.sentry.Sentry
 import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okio.ByteString.Companion.decodeHex
 import org.lsposed.lsparanoid.Obfuscate
 import java.io.BufferedReader
 import java.io.InputStream
@@ -81,12 +80,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         Thread {
-            // fetchPins() // this already works, verify is broken now
+            fetchPins() // this already works, verify is broken now
             verifyConnection()
-            //runOnUiThread {}
+            runOnUiThread {
+                setupWebView()
+            }
         }.start()
-
-        setupWebView()
     }
 
     private fun getPC():String {
@@ -111,25 +110,22 @@ class MainActivity : AppCompatActivity() {
         val urlConnection = url.openConnection() as HttpsURLConnection
         urlConnection.sslSocketFactory = context.socketFactory
 
-        Log.i(tag, "Fetching certificate pins...")
-
         try {
             val rd = BufferedReader(
                 InputStreamReader(urlConnection.inputStream)
             )
             var line: String?
             while (rd.readLine().also { line = it } != null) {
-                Log.d("[verify] SSLCertificatePins", line!!)
+                Log.d("[fetch] SSLCertificatePins", line!!)
                 val header = urlConnection.getHeaderField("X-Pin-Challenge")
                 if (header !== null && validatePinning(line!!, header, getPC())) {
                     updateDynamicPins(line!!)
                 } else {
-                    Log.d(tag, "Pinning header not found.")
+                    Log.d(tag, "[update] Pinning header not found.")
                 }
             }
         } catch (e: java.lang.Exception) {
             if (inDevelopment()) e.printStackTrace()
-            e.printStackTrace()
         } finally {
             urlConnection.disconnect()
         }
@@ -141,7 +137,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun verifyConnection() {
 
-        val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+
 
         val cf = CertificateFactory.getInstance("X.509")
         val caInput: InputStream
@@ -161,7 +157,7 @@ class MainActivity : AppCompatActivity() {
 
         /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
         val keyStoreType = KeyStore.getDefaultType()
-        Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
+        //Log.d(tag, "[verify:RootCA] Root keyStoreType: " + keyStoreType)
 
         val keyStore = KeyStore.getInstance(keyStoreType)
         keyStore.load(null, null)
@@ -177,7 +173,7 @@ class MainActivity : AppCompatActivity() {
         /*** Client Certificate  */
         val pc = getPC()
         val clientKeyStore = KeyStore.getInstance("BKS")
-        val certInput = resources.openRawResource(R.raw.alice)
+        val certInput = resources.openRawResource(R.raw.alice_v1)
 
         //try {
             clientKeyStore.load(certInput, pc.toCharArray())
@@ -189,7 +185,8 @@ class MainActivity : AppCompatActivity() {
 
             // Create a KeyManager that uses our client cert
             val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-            kmf.init(clientKeyStore, pc.toCharArray()) // this keystore has no password?
+            kmf.init(clientKeyStore, pc.toCharArray())
+            //kmf.keyManagers
 
             /*** SSL Connection (v1)  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
@@ -197,6 +194,7 @@ class MainActivity : AppCompatActivity() {
             context.init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
 
             /*** HttpsURLConnection with custom socket factory */
+            val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
             val conn = url.openConnection() as HttpsURLConnection
             conn.sslSocketFactory = context.socketFactory
             val inputstream = conn.inputStream
@@ -212,12 +210,12 @@ class MainActivity : AppCompatActivity() {
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
-            Log.i(tag,"[verify] Authenticating client as Alice")
+            Log.i(tag,"[verify2] Authenticating client as Alice")
 
             val responseCode = urlConnection.responseCode
 
             if (responseCode != 200) {
-                Log.i(tag,"[error] Server returned HTTP Error " + responseCode.toString())
+                Log.e(tag,"[verify2] Server returned HTTP Error " + responseCode.toString())
                 Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
 
@@ -234,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                     Log.d("[verify] Response 2", ": $line")
                 }
             } catch (e: java.lang.Exception) {
-                Log.d(tag, "[verify] Authentication InputStream Exception:")
+                Log.e(tag, "[verify] Authentication InputStream Exception:")
                 if (this.inDevelopment()) e.printStackTrace()
                 Sentry.captureException(e)
             } finally {
@@ -274,7 +272,11 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         // Do something with the okHttpClient (call /authenticate/:id) and put result into the WebView
-        val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + UUID.randomUUID().toString())
+
+        /*** TODO: this does not support client certificate at the moment !!!
+         */
+
+        val url = URL("https://ctf24.teacloud.net:8090/authenticate/" + UUID.randomUUID().toString())
 
         val request: Request = Request.Builder()
             .url(url)
@@ -285,8 +287,8 @@ class MainActivity : AppCompatActivity() {
             {
                 Log.d("PinnedResponse", response.body?.string()!!)
                 // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
-                //val myWebView: WebView = findViewById(R.id.webview)
-                //myWebView.loadData(response.body?.string()!!, "text/html; charset=utf-8", "UTF-8")
+                val myWebView: WebView = findViewById(R.id.webview)
+                myWebView.loadData(response.body!!.string()!!, "text/html; charset=utf-8", "UTF-8")
 
             }
         }
@@ -309,6 +311,7 @@ class MainActivity : AppCompatActivity() {
         val inHash = hash(pc + "$" + json)
         val inHashEncoded = Base64.getEncoder().encode(inHash.toByteArray())
         val headerHex = deBase.toHex()
+        Log.d(tag, "Compare inHash: "+inHash+" with headerHex: "+headerHex)
         return if (inHash.equals(headerHex)) true else false
     }
 
@@ -316,7 +319,7 @@ class MainActivity : AppCompatActivity() {
         val myWebView: WebView = findViewById(R.id.webview)
 
         // This should use HttpsURLConnection with client certificate instead (old variant)
-        val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
+        val url = "https://ctf24.teacloud.net:8090/hello/" + UUID.randomUUID().toString()
 
         myWebView.loadUrl(url)
 
