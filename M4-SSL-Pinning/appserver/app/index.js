@@ -97,45 +97,52 @@ app.get('/authenticate/:id', (req, res) => {
     return;
   }
 
-  // Check client certificate
+  // Unauthorized (debugging) flow
+  if (req.client.authorized == false) {
 
-  const cert = req.socket.getPeerCertificate()
+    // Check client certificate
 
-  if (Object.keys(cert).length == 0) {
-    console.log("Socket cert is null (responding with 200 and exiting flow)")
-    res.status(200)
-      .send(`I'm a teapot`)
+    const cert = req.socket.getPeerCertificate()
+
+    if (Object.keys(cert).length == 0) {
+      console.log("Auth=", req.client.authorized, ", Socket cert is null (responding with 200 and exiting flow)")
+      res.status(200)
+        .send(`I'm a teapot`)
+      return;
+    }
+
+    console.log("Debug incoming cert", { cert })
+
+    const subject = cert.subject.CN
+
+    // This really does not work (why?) so we're using own validation and error handling (below).
+    // const authorized = req.client.authorized
+    // console.log("Authorized: ", {authorized});
+
+    // Validate subject CN
+    if (cert.subject.CN.indexOf("alice@ctf24.teacloud.net") === -1) {
+      console.log(`Unknown subject ${subject} in cert`, { cert })
+
+      // Validate issuer CN
+      if (cert.issuer.CN.indexOf("ctf24.teacloud.net") === -1) {
+        res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
+        return;
+      }
+
+      // Validate pinned client fingerprint
+      if (cert.fingerprint.indexOf(pingerprint) === -1) {
+        res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
+        return;
+      }
+
+    }
     return;
-  }
-
-  console.log("Debug incoming cert", { cert })
-
-  const subject = cert.subject.CN
-
-  // This really does not work (why?) so we're using own validation and error handling (below).
-  // const authorized = req.client.authorized
-  // console.log("Authorized: ", {authorized});
-
-  // Validate subject CN
-  if (cert.subject.CN.indexOf("alice@ctf24.teacloud.net") === -1) {
-    console.log(`Unknown subject ${subject} in cert`, { cert })
-
-    // Validate issuer CN
-    if (cert.issuer.CN.indexOf("ctf24.teacloud.net") === -1) {
-      res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
-      return;
-    }
-
-    // Validate pinned client fingerprint
-    if (cert.fingerprint.indexOf(pingerprint) === -1) {
-      res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
-      return;
-    }
-
   }
 
   let r_headers = req.headers
   let r_id = req.path.replace('/authenticate/', '')
+
+  console.log("AUTH", { r_headers, r_id })
 
   // check user agent
   let ua = r_headers['user-agent'];
@@ -146,6 +153,17 @@ app.get('/authenticate/:id', (req, res) => {
     return
   }
 
+  /* okHttp?
+  AUTH {
+2024-02-17T10:42:27.302485876Z   r_headers: {
+2024-02-17T10:42:27.302491045Z     'user-agent': 'Dalvik/2.1.0 (Linux; U; Android 14; sdk_gphone64_x86_64 Build/UE1A.230829.036.A1)',
+2024-02-17T10:42:27.302495305Z     host: 'ctf24.teacloud.net:8890',
+2024-02-17T10:42:27.302499276Z     connection: 'Keep-Alive',
+2024-02-17T10:42:27.302503130Z     'accept-encoding': 'gzip'
+2024-02-17T10:42:27.302507019Z   },
+2024-02-17T10:42:27.302510884Z   r_id: 'b83d7452-1aca-48ce-baef-4ebed6eedf5f'
+2024-02-17T10:42:27.302514761Z }
+
   let rw = r_headers['x-requested-with']
 
   if (rw.indexOf('cz.corpus.sslpinning') == -1) {
@@ -153,6 +171,7 @@ app.get('/authenticate/:id', (req, res) => {
     res.status(417).send("Try again (2).")
     return
   }
+  */
 
   // check uuid
   if (validate(r_id) === false) {
