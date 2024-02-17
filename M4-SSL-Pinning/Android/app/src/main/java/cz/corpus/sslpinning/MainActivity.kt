@@ -32,7 +32,6 @@ import java.util.*
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
 
 
@@ -80,11 +79,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         Thread {
-            fetchPins() // this already works, verify is broken now
-            verifyConnection()
             runOnUiThread {
                 setupWebView()
             }
+            fetchPins() // this already works, verify is broken now
+            verifyConnection()
         }.start()
     }
 
@@ -153,7 +152,7 @@ class MainActivity : AppCompatActivity() {
 
         /*** Get CA certificate */
         val ca: Certificate = cf.generateCertificate(caInput)
-        Log.d(tag, "[verify:RootCA] ca=" + (ca as X509Certificate).getSubjectDN())
+        //Log.d(tag, "[authenticate] RootCA=" + (ca as X509Certificate).getSubjectDN())
 
         /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
         val keyStoreType = KeyStore.getDefaultType()
@@ -174,19 +173,12 @@ class MainActivity : AppCompatActivity() {
         val pc = getPC()
         val clientKeyStore = KeyStore.getInstance("BKS")
         val certInput = resources.openRawResource(R.raw.alice_v1)
-
-        //try {
-            clientKeyStore.load(certInput, pc.toCharArray())
-        //} finally {
-        //    certInput.close();
-        //}
+        clientKeyStore.load(certInput, pc.toCharArray())
 
         try {
-
             // Create a KeyManager that uses our client cert
             val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
             kmf.init(clientKeyStore, pc.toCharArray())
-            //kmf.keyManagers
 
             /*** SSL Connection (v1)  */
             // Create an SSLContext that uses our TrustManager and our KeyManager
@@ -203,23 +195,24 @@ class MainActivity : AppCompatActivity() {
 
             var string: String? = null
             while (bufferedreader.readLine().also { string = it } != null) {
-                Log.d("[verify] Response 1", ": $string")
+                // Should return I'm a teapot - seems to be not authenticated.
+                Log.d("[authenticate]", "Response: $string")
             }
+
+            Log.i("[authenticate]","Authenticating client as Alice")
 
             // Connection to `appserver`
             val urlConnection = url.openConnection() as HttpsURLConnection
             urlConnection.sslSocketFactory = context.socketFactory
 
-            Log.i(tag,"[verify2] Authenticating client as Alice")
+
 
             val responseCode = urlConnection.responseCode
 
             if (responseCode != 200) {
-                Log.e(tag,"[verify2] Server returned HTTP Error " + responseCode.toString())
+                Log.e("[authenticate]","[verify] Server returned HTTP Error " + responseCode.toString())
                 Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
-
-                // TODO: FIXME: Returns Error 500 (probably when certificate is not used – see server log)
                 return
             }
 
@@ -232,19 +225,10 @@ class MainActivity : AppCompatActivity() {
                 Thread {
                     runOnUiThread {
                         val line = rd.readLine()
-                        Log.d("[verify] Response 2", ": $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
-                        myWebView.loadData(line, "text/html; charset=utf-8", "UTF-8")
+                        Log.d("[authenticate]", " Response 2: $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
+                        myWebView.loadData(Base64.getEncoder().encodeToString(line.toByteArray(Charsets.UTF_8)), "text/html; charset=utf-8", "base64")
                     }
                 }.start()
-                /*
-                while (rd.readLine().also { line = it } != null) {
-                    Log.d("[verify] Response 2", ": $line") // REMOVE IN PRODUCTION, KEEP IN VISIBLE IN VW
-                    Thread {
-                        runOnUiThread {
-                            myWebView.loadData(line!!, "text/html; charset=utf-8", "UTF-8")
-                        }
-                    }.start()
-                }*/
                 val header = urlConnection.getHeaderField("Authorization")
                 Log.d("[JWT]", ": $header") // REMOVE IN PRODUCTION
             } catch (e: java.lang.Exception) {
@@ -280,7 +264,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Keep for later
-        //return
+        return
 
         // This seems to be missing SSLFactory
         val okHttpClient = OkHttpClient.Builder()
@@ -335,9 +319,9 @@ class MainActivity : AppCompatActivity() {
         val myWebView: WebView = findViewById(R.id.webview)
 
         // This should use HttpsURLConnection with client certificate instead (old variant)
-        val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
+        //val url = "https://ctf24.teacloud.net/hello/" + UUID.randomUUID().toString()
 
-        myWebView.loadUrl(url)
+        //myWebView.loadUrl(url)
 
         myWebView.setWebViewClient(object : WebViewClient() {
 

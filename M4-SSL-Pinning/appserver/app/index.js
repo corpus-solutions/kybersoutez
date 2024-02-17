@@ -195,7 +195,7 @@ app.get('/authenticate/:id', (req, res) => {
   res.set('Authorization', 'Bearer ' + Buffer.from(token, 'utf-8'))
 
   // HTML contents is not important
-  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><span style="color:white;" id="flagOne">' + flagOne + '</span></body>')
+  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find flags in this app’s authentication flow.</p><span style="color:white;" id="flagOne">' + flagOne + '</span></body>')
 });
 
 // Will deprecate once client certificate authenticated login will be implemented.
