@@ -2,8 +2,8 @@ node_modules
 
 .idea
 
-M4-SSL-Pinning/Android/app/release
+M4-SSL-Pinning/android/app/release
 
 .env
-M4-SSL-Pinning/Android/tools
-M4-SSL-Pinning/Task/app-release-1.1.9.apk.cache
+M4-SSL-Pinning/android/tools
+M4-SSL-Pinning/task/*.cache
