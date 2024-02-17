@@ -104,8 +104,12 @@ app.get('/authenticate/:id', (req, res) => {
 
     const cert = req.socket.getPeerCertificate()
 
+    let r_headers = req.headers
+  
+    console.log("Auth=false", { r_headers })
+
     if (Object.keys(cert).length == 0) {
-      console.log("Auth=", req.client.authorized, ", Socket cert is null (responding with 200 and exiting flow)")
+      console.log("Auth="+req.client.authorized+", Socket cert is null (responding with 200 and exiting flow)")
       res.status(200)
         .send(`I'm a teapot`)
       return;
@@ -142,10 +146,16 @@ app.get('/authenticate/:id', (req, res) => {
   let r_headers = req.headers
   let r_id = req.path.replace('/authenticate/', '')
 
-  console.log("AUTH", { r_headers, r_id })
+  console.log("Auth=true", { r_headers, r_id })
 
   // check user agent
   let ua = r_headers['user-agent'];
+
+  if (ua.indexOf('Dalvik') == -1) {
+    console.log('User-Agent validation failed.')
+    res.status(417).send("Try again (1).")
+    return
+  }
 
   if (ua.indexOf('Android') == -1) {
     console.log('User-Agent validation failed.')
