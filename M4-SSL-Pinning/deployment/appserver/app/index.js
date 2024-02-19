@@ -185,10 +185,12 @@ app.get('/authenticate/:id', (req, res) => {
     if ((validate(r_id) !== false)) reason = "Validator passed when it shouldn't."; // should actually return error
     if (typeof(reason) !== "undefined") console.log('UUID validation failed. Reason:', reason)
     if ((r_id.indexOf("42") === -1)) reason = "Incorrect position:"+r_id.indexOf("42");
-    console.log('UUID validation failed. Reason:', reason)
-    Sentry.captureMessage("Client not authorized, returning 417: Invalid UUID(3)", "warning")
-    res.status(417).send("Try again (3).")
-    return
+    if (typeof(reason) !== "undefined") console.log('UUID validation failed. Reason:', reason)
+    if (typeof(reason) !== "undefined") {
+      Sentry.captureMessage("Client not authorized, returning 417: Invalid UUID(3)", "warning")
+      res.status(417).send("Try again (3).")
+      return
+    }
   } else {
     console.log("42 index: ", r_id.indexOf("42"))
   }
