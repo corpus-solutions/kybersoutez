@@ -13,6 +13,7 @@ const fs = require('fs')
 const https = require('https')
 const path = require('path')
 const jwt = require('jsonwebtoken')
+const helmet = require('helmet')
 const { validate } = require('uuid')
 
 // Monitoring and Profiling
@@ -52,6 +53,7 @@ const pingerprint = 'AB:6B:D9:E8:9B:88:F8:C0:9F:BD:54:77:AF:67:05:C6:27:F4:4D:C8
 //
 
 const app = express()
+app.use(helmet())
 
 Sentry.init({
   dsn: "https://0d204f67985c47d6a91ddde728253df6@o265347.ingest.sentry.io/1468596",

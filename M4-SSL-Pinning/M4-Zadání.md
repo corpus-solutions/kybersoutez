@@ -1,8 +1,8 @@
 # M4 – Zadání
 
-Přilinkujte `frida-gadget` nebo spusťte spusťte `frida-server` tak, aby byla přiložená Android aplikace instrumentovatelná pomocí nástroje Frida/Objection. 
+Přilinkujte `frida-gadget` nebo spusťte `frida-server` tak, aby byla přiložená Android aplikace instrumentovatelná pomocí nástroje Frida/Objection. 
 
-Odsledujte komunikaci s API (bude třeba obejít určité ochrany, aplikace se bude chtít bránit).
+Odsledujte komunikaci s API.
 
 Vlajka je zakódována v odpovědi serveru a je ve formátu UUID.
 
