@@ -155,25 +155,35 @@ app.get('/authenticate/:id', (req, res) => {
   // check user agent
   let ua = r_headers['user-agent'];
 
-  if (ua.indexOf('Dalvik') == -1) {
-    Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(1)", "warning")
-    console.log('User-Agent validation failed.')
-    res.status(417).send("Try again (1).")
-    return
-  }
-
-  if (ua.indexOf('Android') == -1) {
-    console.log('User-Agent validation failed.')
-    Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(2)", "warning")
-    res.status(417).send("Try again (2).")
-    return
+  if (ua.indexOf('okhttp') !== -1) {
+    // okhttp/4.9.0 is a valid client at build time
+    let st = r_headers['sentry-trace'];
+    if (typeof(st) === "undefined") {
+      console.log('User-Agent validation failed.')
+      res.status(417).send("Try again (4).")
+      return
+    }
+  } else {
+    if (ua.indexOf('Dalvik') == -1) {
+      Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(1)", "warning")
+      console.log('User-Agent validation failed.')
+      res.status(417).send("Try again (1).")
+      return
+    }
+  
+    if (ua.indexOf('Android') == -1) {
+      console.log('User-Agent validation failed.')
+      Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(2)", "warning")
+      res.status(417).send("Try again (2).")
+      return
+    }
   }
 
   // check xuuid (uuid, but must contain 42 on certain position thus being intentionally invalid!)
   if ((validate(r_id) !== false) || (r_id.indexOf("42") !== 24)) {
     let reason;
     if ((validate(r_id) !== false)) reason = "Validator passed when it shouldn't."; // should actually return error
-    console.log('UUID validation failed. Reason:', reason)
+    if (typeof(reason) !== "undefined") console.log('UUID validation failed. Reason:', reason)
     if ((r_id.indexOf("42") === -1)) reason = "Incorrect position:"+r_id.indexOf("42");
     console.log('UUID validation failed. Reason:', reason)
     Sentry.captureMessage("Client not authorized, returning 417: Invalid UUID(3)", "warning")
