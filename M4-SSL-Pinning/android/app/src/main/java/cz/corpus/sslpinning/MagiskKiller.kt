@@ -24,7 +24,7 @@ import android.R.attr.top
  * @author canyie
  */
 object MagiskKiller {
-    const val TAG = "MagiskKiller"
+    const val TAG = "CTF24MK"
 
     /** Found some one tracing us (perhaps MagiskHide)  */
     const val FOUND_TRACER = 1 shl 0

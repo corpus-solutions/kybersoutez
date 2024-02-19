@@ -34,13 +34,14 @@ import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 //import cz.corpus.sslpinning.MagiskKiller.*
 
 @Obfuscate
 class MainActivity : AppCompatActivity() {
 
-    var tag:String = "SSLPinning"
+    var tag:String = "CTF24"
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -152,51 +153,6 @@ class MainActivity : AppCompatActivity() {
         return 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
     }
 
-    private fun context(): SSLContext {
-        /*** Get CA certificate */
-        val cf = CertificateFactory.getInstance("X.509")
-        val caInput: InputStream
-        val resource: Int
-
-        /*** Select resource based on runtime environment */
-        if (this.inDevelopment())
-            resource = R.raw.trusted_roots_dev
-        else
-            resource = R.raw.trusted_roots
-
-        caInput = resources.openRawResource(resource)
-
-        val ca: Certificate = cf.generateCertificate(caInput)
-
-        /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
-        val keyStoreType = KeyStore.getDefaultType()
-        val keyStore = KeyStore.getInstance(keyStoreType)
-        keyStore.load(null, null)
-        keyStore.setCertificateEntry("ca", ca)
-
-        // Create a TrustManager that trusts the CAs in our KeyStore
-        val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
-        val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
-        tmf.init(keyStore)
-
-        /*** Client Certificate  */
-        val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
-        val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
-        val clientKeyStore = KeyStore.getInstance("BKS")
-        val certInput = resources.openRawResource(R.raw.alice_v1)
-        clientKeyStore.load(certInput, pc.toCharArray())
-
-        // Create a KeyManager that uses our client cert
-        val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        kmf.init(clientKeyStore, pc.toCharArray())
-
-        /*** SSL Connection (v1)  */
-        // Create an SSLContext that uses our TrustManager and our KeyManager
-        val context = SSLContext.getInstance("TLS") // TLSv1.2, TLSv1.3
-        context.init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
-        return context
-    }
-
     private fun verifyConnection() {
 
         /*** Get CA certificate */
@@ -213,6 +169,7 @@ class MainActivity : AppCompatActivity() {
         caInput = resources.openRawResource(resource)
 
         val ca: Certificate = cf.generateCertificate(caInput)
+        caInput.close()
 
         /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
         val keyStoreType = KeyStore.getDefaultType()
@@ -231,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         val clientKeyStore = KeyStore.getInstance("BKS")
         val certInput = resources.openRawResource(R.raw.alice_v1)
         clientKeyStore.load(certInput, pc.toCharArray())
+        certInput.close()
 
         try {
             // Create a KeyManager that uses our client cert
@@ -246,9 +204,15 @@ class MainActivity : AppCompatActivity() {
             var xuuid = UUID.randomUUID().toString()
             xuuid = xuuid.replaceRange(24, 25, "42")
             //Log.d(tag, xuuid)
+
+            // THIS actually does nothing.
+            HttpsURLConnection.setDefaultSSLSocketFactory(context.socketFactory)
+
             val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + xuuid)
             val conn = url.openConnection() as HttpsURLConnection
             conn.sslSocketFactory = context.socketFactory
+            //conn.requestMethod = "GET"
+
             val inputstream = conn.inputStream
             val inputstreamreader = InputStreamReader(inputstream)
             val bufferedreader = BufferedReader(inputstreamreader)
@@ -263,10 +227,15 @@ class MainActivity : AppCompatActivity() {
                 Log.d("[authenticate]", "Response 1: $string")
             }
 
+            // This may break it!
+            conn.disconnect()
+
             Log.i("[authenticate]","Authenticating client")
 
             // Connection to `appserver`
             val urlConnection = url.openConnection() as HttpsURLConnection
+
+            // THIS (!) Actually sets the client certificate.
             urlConnection.sslSocketFactory = context.socketFactory
 
             val responseCode = urlConnection.responseCode
@@ -326,11 +295,54 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Keep for later
-        return
+        //return
+
+        /*** Get CA certificate */
+        val cf = CertificateFactory.getInstance("X.509")
+        val caInput: InputStream
+        val resource: Int
+
+        /*** Select resource based on runtime environment */
+        if (this.inDevelopment())
+            resource = R.raw.trusted_roots_dev
+        else
+            resource = R.raw.trusted_roots
+
+        caInput = resources.openRawResource(resource)
+
+        val ca: Certificate = cf.generateCertificate(caInput)
+
+        /*** Create a KeyStore containing our trusted CAs from `trusted_roots` */
+        val keyStoreType = KeyStore.getDefaultType()
+        val keyStore = KeyStore.getInstance(keyStoreType)
+        keyStore.load(null, null)
+        keyStore.setCertificateEntry("ca", ca)
+
+        // Create a TrustManager that trusts the CAs in our KeyStore
+        val tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm()
+        val tmf = TrustManagerFactory.getInstance(tmfAlgorithm)
+        tmf.init(keyStore)
+
+        /*** Client Certificate  */
+        val cp = applicationContext.packageName.split(".").toTypedArray() // cz.corpus.sslpinning
+        val pc = cp.reversedArray().joinToString(".") //  sslpinning.corpus.cz
+        val clientKeyStore = KeyStore.getInstance("BKS")
+        val certInput = resources.openRawResource(R.raw.alice_v1)
+        clientKeyStore.load(certInput, pc.toCharArray())
+
+        // Create a KeyManager that uses our client cert
+        val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        kmf.init(clientKeyStore, pc.toCharArray())
+
+        /*** SSL Connection (v1)  */
+        // Create an SSLContext that uses our TrustManager and our KeyManager
+        val context = SSLContext.getInstance("TLS") // TLSv1.2, TLSv1.3
+        context.init(kmf.keyManagers, tmf.trustManagers, SecureRandom())
 
         // This seems to be missing SSLFactory
         val okHttpClient = OkHttpClient.Builder()
             .certificatePinner(certificatePinner.build())
+            .sslSocketFactory(context.socketFactory, tmf.trustManagers[0] as X509TrustManager)
             .build()
 
         // Do something with the okHttpClient (call /authenticate/:id) and put result into the WebView
@@ -339,23 +351,30 @@ class MainActivity : AppCompatActivity() {
          */
 
         var xuuid = UUID.randomUUID().toString()
-        xuuid = xuuid.replaceRange(27, 29, "42")
-        //Log.d(tag, xuuid)
-        val url = URL("https://ctf24.teacloud.net:8090/authenticate/" + xuuid)
+        xuuid = xuuid.replaceRange(24, 25, "42")
+
+        val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + xuuid)
 
         val request: Request = Request.Builder()
             .url(url)
             .build()
 
-        okHttpClient.newCall(request).execute().use {
-                response ->
-            {
-                //Log.d("PinnedResponse", response.body?.string()!!)
-                // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
-                val myWebView: WebView = findViewById(R.id.webview)
-                myWebView.loadData(response.body!!.string(), "text/html; charset=utf-8", "UTF-8")
+        try {
 
+            val response = okHttpClient.newCall(request).execute().use { response -> Log.d("DEVTAG", response.body!!.string()) }
+
+            okHttpClient.newCall(request).execute().use {
+                    response ->
+                {
+                    Log.d(tag, "Response 3:" + response.body?.string()!!)
+                    // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
+                    val myWebView: WebView = findViewById(R.id.webview)
+                    myWebView.loadData(response.body!!.string(), "text/html; charset=utf-8", "UTF-8")
+                }
             }
+
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
         }
     }
     private fun hash(data: String): String {

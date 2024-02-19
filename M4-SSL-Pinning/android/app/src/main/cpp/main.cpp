@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <android/log.h>
 
-#define LOG_TAG "MagiskKiller"
+#define LOG_TAG "CTF24MK"
 #define LOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
