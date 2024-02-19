@@ -91,6 +91,12 @@ app.use(function onError(err, req, res, next) {
 
 app.get('/authenticate/:id', (req, res) => {
 
+  let r_headers = req.headers
+  let r_id = req.path.replace('/authenticate/', '') || false
+
+  console.log("[authenticate] @", new Date().getTime()/1000)
+  console.log("Auth=" + req.client.authorized, { r_headers, r_id })
+
   /* Prevent crash on getPeerCertificate() when called over HTTP */
   const isHTTPS = typeof (req.socket.getPeerCertificate)
   if (isHTTPS !== "function") {
@@ -101,19 +107,16 @@ app.get('/authenticate/:id', (req, res) => {
   }
 
   // Unauthorized flow
-  if (req.client.authorized == false) {
+  if (!req.client.authorized) {
 
     // Check client certificate
     const cert = req.socket.getPeerCertificate()
 
-    let r_headers = req.headers
-  
-    console.log("Auth=false", { r_headers })
-
     if (Object.keys(cert).length == 0) {
-      console.log("Auth="+req.client.authorized+", Socket cert is null (responding with 200 and exiting flow)")
+      console.log("Auth="+req.client.authorized+", AND cert is null, returning 200: Try again.")
+      Sentry.captureMessage("Client not authorized, returning 200: Try again.", "warning")
       res.status(200)
-        .send(`I'm a teapot`)
+        .send(`Hello Hacker. Try again.`)
       return;
     }
 
@@ -131,28 +134,29 @@ app.get('/authenticate/:id', (req, res) => {
 
       // Validate issuer CN
       if (cert.issuer.CN.indexOf("ctf24.teacloud.net") === -1) {
+        Sentry.captureMessage("Client not authorized, returning 412: Invalid Subject", "warning")
         res.status(412).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
         return;
       }
 
       // Validate pinned client fingerprint
       if (cert.fingerprint.indexOf(pingerprint) === -1) {
+        Sentry.captureMessage("Client not authorized, returning 412: Fingerprint mismatch", "warning")
         res.status(403).send(`Sorry ${cert.subject.CN}, your are not welcome here.`)
         return;
       }
 
     }
+
+    Sentry.captureMessage("Client not authorized, passing through to other checks", "debug")
+
   }
-
-  let r_headers = req.headers
-  let r_id = req.path.replace('/authenticate/', '')
-
-  console.log("Auth=true", { r_headers, r_id })
 
   // check user agent
   let ua = r_headers['user-agent'];
 
   if (ua.indexOf('Dalvik') == -1) {
+    Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(1)", "warning")
     console.log('User-Agent validation failed.')
     res.status(417).send("Try again (1).")
     return
@@ -160,15 +164,23 @@ app.get('/authenticate/:id', (req, res) => {
 
   if (ua.indexOf('Android') == -1) {
     console.log('User-Agent validation failed.')
-    res.status(417).send("Try again (1).")
+    Sentry.captureMessage("Client not authorized, returning 417: Invalid User-Agent(2)", "warning")
+    res.status(417).send("Try again (2).")
     return
   }
 
-  // check uuid
-  if (validate(r_id) === false) {
-    console.log('UUID validation failed.')
+  // check xuuid (uuid, but must contain 42 on certain position thus being intentionally invalid!)
+  if ((validate(r_id) !== false) || (r_id.indexOf("42") !== 24)) {
+    let reason;
+    if ((validate(r_id) !== false)) reason = "Validator passed when it shouldn't."; // should actually return error
+    console.log('UUID validation failed. Reason:', reason)
+    if ((r_id.indexOf("42") === -1)) reason = "Incorrect position:"+r_id.indexOf("42");
+    console.log('UUID validation failed. Reason:', reason)
+    Sentry.captureMessage("Client not authorized, returning 417: Invalid UUID(3)", "warning")
     res.status(417).send("Try again (3).")
     return
+  } else {
+    console.log("42 index: ", r_id.indexOf("42"))
   }
 
   // respond with JWT
@@ -177,8 +189,11 @@ app.get('/authenticate/:id', (req, res) => {
 
   // HTML contents is not important
   res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find flags hidden in this app’s authentication flow.</p></body>')
+
+  Sentry.captureMessage("Client served.", "info")
 });
 
 https.createServer(opts, app).listen(https_port, () => {
+  Sentry.captureMessage("HTTPS server restarted", "info")
   console.log(`HTTPS server started on port ${https_port}`)
 });
