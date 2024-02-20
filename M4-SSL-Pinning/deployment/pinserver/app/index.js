@@ -3,6 +3,8 @@ const path = require('path')
 const node_crypto = require('crypto')
 const express = require('express')
 const helmet = require('helmet')
+
+// deepcode ignore UseCsurfForExpress: this is only API with single GET request, CSRF does not apply
 const app = express()
 
 //

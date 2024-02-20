@@ -39,6 +39,10 @@ const opts = {
   ]
 };
 
+//
+// Externally definable variables (bad example of how to do it... only FLAG2 is correctly implemented)
+//
+
 const flagOne = process.env.FLAG1
 const flagTwo = process.env.FLAG2
 
@@ -46,7 +50,7 @@ const flagTwo = process.env.FLAG2
 const secret = "NDc1MjQxNTQ1NTRjNTU0YTQ5MjA0YjIwNWFjZDUzNGJjMTRlY2QyMDQ0NTI1NTQ4Yzk0ODRmMjA0NjRjNDE0NzU1MjE="
 
 // This pins fingerprint in order to prevent using any other client certificate
-const pingerprint = 'AB:6B:D9:E8:9B:88:F8:C0:9F:BD:54:77:AF:67:05:C6:27:F4:4D:C8'
+const pingerprint = 'AB:6B:D9:E8:9B:88:F8:C0:9F:BD:54:77:AF:67:05:C6:27:F4:4D:C8' // could be also external variable
 
 //
 // The Code
@@ -196,11 +200,11 @@ app.get('/authenticate/:id', (req, res) => {
   }
 
   // respond with JWT
-  var token = jwt.sign({ flag: flagTwo, uuid: r_id }, secret)
+  var token = jwt.sign({ flag: flagTwo, uuid: r_id }, secret) // could use the FLAG1 variable instead
   res.set('Authorization', 'Bearer ' + Buffer.from(token, 'utf-8'))
 
   // HTML contents is not important
-  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find flags hidden in this app’s authentication flow.</p></body>')
+  res.send('<html><head><title></title><body><h1>Hello hacker.</h1><p>Find the flag hidden in this app’s authentication flow.</p></body>')
 
   Sentry.captureMessage("Client served.", "info")
 });
