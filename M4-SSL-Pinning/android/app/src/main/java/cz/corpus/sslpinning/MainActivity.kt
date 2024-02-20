@@ -267,15 +267,14 @@ class MainActivity : AppCompatActivity() {
                     InputStreamReader(urlConnection.inputStream)
                 )
 
-                val myWebView: WebView = findViewById(R.id.webview)
-                Thread {
-                    runOnUiThread {
-                        val line = rd.readLine()
-                        // TODO: Remove
-                        //Log.d("[authenticate]", "Response 2: $line")
-                        myWebView.loadData(Base64.getEncoder().encodeToString(line.toByteArray(Charsets.UTF_8)), "text/html; charset=utf-8", "base64")
-                    }
-                }.start()
+                val line = rd.readLine()
+                // TODO: Remove
+                //Log.d("[authenticate]", "Response 2: $line")
+                val webView: WebView = findViewById(R.id.webview)
+                webView.post(Runnable {
+                    webView.loadData(Base64.getEncoder().encodeToString(line.toByteArray(Charsets.UTF_8)), "text/html; charset=utf-8", "base64")
+                })
+
                 val header = urlConnection.getHeaderField("Authorization")
             } catch (e: java.lang.Exception) {
                 Log.e(tag, "[verify] Authentication InputStream Exception:")
@@ -376,15 +375,27 @@ class MainActivity : AppCompatActivity() {
 
         try {
 
-            val response = okHttpClient.newCall(request).execute().use { response -> Log.d("DEVTAG", response.body!!.string()) }
+            var response = okHttpClient.newCall(request).execute().use { response ->
+                {
+                    Log.d("SSLPinning", response.body!!.string())
+                    Log.d(tag, "Response 3A:" + response.body?.string()!!)
+                    // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
+                    val webView: WebView = findViewById(R.id.webview)
+                    webView.post(Runnable {
+                        webView.loadData(response.body!!.string(), "text/html; charset=utf-8", "UTF-8")
+                    })
+                }
+            }
 
-            okHttpClient.newCall(request).execute().use {
+            response = okHttpClient.newCall(request).execute().use {
                     response ->
                 {
-                    Log.d(tag, "Response 3:" + response.body?.string()!!)
+                    Log.d(tag, "Response 3B:" + response.body?.string()!!)
                     // Inject pinned response HTML to WebView (nothing complex, no images or relative paths needed)
-                    val myWebView: WebView = findViewById(R.id.webview)
-                    myWebView.loadData(response.body!!.string(), "text/html; charset=utf-8", "UTF-8")
+                    val webView: WebView = findViewById(R.id.webview)
+                    webView.post(Runnable {
+                        webView.loadData(response.body!!.string(), "text/html; charset=utf-8", "UTF-8")
+                    })
                 }
             }
 
