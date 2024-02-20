@@ -3,6 +3,7 @@ package cz.corpus.sslpinning
 import android.annotation.SuppressLint
 import android.content.pm.ApplicationInfo
 import android.net.http.SslError
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.SslErrorHandler
@@ -21,6 +22,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.lsposed.lsparanoid.Obfuscate
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URL
@@ -86,11 +88,25 @@ class MainActivity : AppCompatActivity() {
             Sentry.captureMessage("Started on valid device.")
         }
 
+        // Simple emulator detection (for statistic purposes, non-personalized)
+        // It would be much more interesting if non-development
+        // version of app would exit at this point.
+        // However, I've decided to make this easier for contestants.
+
+        val isEmulator = checkEmulatorFiles() || checkBuildConfig()
+        if (isEmulator) {
+            Sentry.captureMessage("Started on emulator")
+            if (this.inDevelopment()) {
+                Log.d(tag, "Emulator detected")
+            } else {
+                Log.d(tag, "Emulator not detected")
+            }
+        }
+
         Thread {
             MagiskKiller.loadNativeLibrary()
             val result = MagiskKiller.detect(applicationInfo.sourceDir)
             // Log.d("MagiskKiller result", result.toString())
-
             val sb = StringBuilder()
             val bl: Int =
                 if (result and FOUND_BOOTLOADER_UNLOCKED != 0) R.string.unlocked else if (result and FOUND_BOOTLOADER_SELF_SIGNED != 0) R.string.self_signed else R.string.locked
@@ -98,7 +114,6 @@ class MainActivity : AppCompatActivity() {
             Log.d(tag, sb.toString())
             // Will detect bootloader, but without action (easier task)
             Sentry.captureMessage(sb.toString())
-
         }.start()
 
         Thread {
@@ -257,7 +272,7 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         val line = rd.readLine()
                         // TODO: Remove
-                        Log.d("[authenticate]", "Response 2: $line")
+                        //Log.d("[authenticate]", "Response 2: $line")
                         myWebView.loadData(Base64.getEncoder().encodeToString(line.toByteArray(Charsets.UTF_8)), "text/html; charset=utf-8", "base64")
                     }
                 }.start()
@@ -426,6 +441,85 @@ class MainActivity : AppCompatActivity() {
                 handler.cancel()
             }
         })
+    }
+
+    // Emulator Detection
+
+    private val GENY_FILES = arrayOf(
+        "/dev/socket/genyd",
+        "/dev/socket/baseband_genyd"
+    )
+    private val PIPES = arrayOf(
+        "/dev/socket/qemud",
+        "/dev/qemu_pipe"
+    )
+    private val X86_FILES = arrayOf(
+        "ueventd.android_x86.rc",
+        "x86.prop",
+        "ueventd.ttVM_x86.rc",
+        "init.ttVM_x86.rc",
+        "fstab.ttVM_x86",
+        "fstab.vbox86",
+        "init.vbox86.rc",
+        "ueventd.vbox86.rc"
+    )
+    private val ANDY_FILES = arrayOf(
+        "fstab.andy",
+        "ueventd.andy.rc"
+    )
+    private val NOX_FILES = arrayOf(
+        "fstab.nox",
+        "init.nox.rc",
+        "ueventd.nox.rc"
+    )
+    fun checkFiles(targets: Array<String>): Boolean {
+        for (pipe in targets) {
+            val file = File(pipe)
+            if (file.exists()) {
+                return true
+            }
+        }
+        return false
+    }
+    fun checkEmulatorFiles():Boolean {
+        return (checkFiles(GENY_FILES)
+                || checkFiles(ANDY_FILES)
+                || checkFiles(NOX_FILES)
+                || checkFiles(X86_FILES)
+                || checkFiles(PIPES))
+    }
+
+    private fun checkBuildConfig(): Boolean {
+        var isEmulator = (Build.MANUFACTURER.contains("Genymotion")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("sdk_gphone")
+                || Build.MODEL.lowercase().contains("droid4x")
+                || Build.MODEL.lowercase().contains("emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.HARDWARE == "goldfish"
+                || Build.HARDWARE == "vbox86"
+                || Build.HARDWARE == "ranchu"
+                || Build.HARDWARE.lowercase().contains("nox")
+                || Build.FINGERPRINT.startsWith("generic")
+                || (Build.PRODUCT.contains("x86_64") && Build.PRODUCT.contains("sdk"))
+                || Build.PRODUCT == "google_sdk"
+                || Build.PRODUCT == "sdk_x86"
+                || Build.PRODUCT == "vbox86p"
+                || Build.PRODUCT.lowercase().contains("nox")
+                || Build.BOARD.lowercase().contains("nox")
+                || Build.BOARD.lowercase().contains("goldfish")
+                || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic")))
+
+        if (!isEmulator && this.inDevelopment()) {
+            Log.d("MODEL", Build.MODEL)
+            Log.d("HARDWARE", Build.HARDWARE)
+            Log.d("FINGERPRINT", Build.FINGERPRINT)
+            Log.d("PRODUCT", Build.PRODUCT)
+            Log.d("BOARD", Build.BOARD)
+            Log.d("BRAND", Build.BRAND)
+        }
+
+        return isEmulator
     }
 }
 

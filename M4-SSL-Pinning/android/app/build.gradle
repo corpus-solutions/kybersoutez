@@ -13,8 +13,8 @@ android {
         applicationId "cz.corpus.sslpinning"
         minSdk 30
         targetSdk 34
-        versionCode 43
-        versionName "1.2.1"
+        versionCode 44
+        versionName "1.2.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
