@@ -13,10 +13,6 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
-import com.scottyab.rootbeer.RootBeer
-import cz.corpus.sslpinning.MagiskKiller.FOUND_BOOTLOADER_SELF_SIGNED
-import cz.corpus.sslpinning.MagiskKiller.FOUND_BOOTLOADER_UNLOCKED
-import io.sentry.Sentry
 import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -37,8 +33,6 @@ import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
-
-//import cz.corpus.sslpinning.MagiskKiller.*
 
 @Obfuscate
 class MainActivity : AppCompatActivity() {
@@ -67,54 +61,10 @@ class MainActivity : AppCompatActivity() {
             }.start()
         }
 
-        val rootBeer = RootBeer(this)
-        if (this.inDevelopment()) {
-            rootBeer.setLogging(false) // see how it works
-        } else {
-            rootBeer.setLogging(false)
-        }
-        if (rootBeer.isRooted) {
-            if (this.inDevelopment()) {
-                Sentry.captureMessage("Debugging on compromised device.")
-                // This is currently allowed.
-            } else {
-                Sentry.captureMessage("Terminated on compromised device in release mode.")
-                // We found indication of root. Application will be terminated.
-                this.finishAndRemoveTask()
-                System.exit(0)
-            }
-        } else {
-            // We didn't find indication of root or this is a Debug build.
-            Sentry.captureMessage("Started on valid device.")
-        }
-
         // Simple emulator detection (for statistic purposes, non-personalized)
         // It would be much more interesting if non-development
         // version of app would exit at this point.
         // However, I've decided to make this easier for contestants.
-
-        val isEmulator = checkEmulatorFiles() || checkBuildConfig()
-        if (isEmulator) {
-            Sentry.captureMessage("Started on emulator")
-            if (this.inDevelopment()) {
-                Log.d(tag, "Emulator detected")
-            } else {
-                Log.d(tag, "Emulator not detected")
-            }
-        }
-
-        Thread {
-            MagiskKiller.loadNativeLibrary()
-            val result = MagiskKiller.detect(applicationInfo.sourceDir)
-            // Log.d("MagiskKiller result", result.toString())
-            val sb = StringBuilder()
-            val bl: Int =
-                if (result and FOUND_BOOTLOADER_UNLOCKED != 0) R.string.unlocked else if (result and FOUND_BOOTLOADER_SELF_SIGNED != 0) R.string.self_signed else R.string.locked
-            sb.append(getString(R.string.bootloader, getString(bl)))
-            Log.d(tag, sb.toString())
-            // Will detect bootloader, but without action (easier task)
-            Sentry.captureMessage(sb.toString())
-        }.start()
 
         Thread {
             runOnUiThread {
@@ -226,7 +176,6 @@ class MainActivity : AppCompatActivity() {
             val url = URL("https://ctf24.teacloud.net:8890/authenticate/" + xuuid)
             val conn = url.openConnection() as HttpsURLConnection
             conn.sslSocketFactory = context.socketFactory
-            //conn.requestMethod = "GET"
 
             val inputstream = conn.inputStream
             val inputstreamreader = InputStreamReader(inputstream)
@@ -239,11 +188,8 @@ class MainActivity : AppCompatActivity() {
             while (bufferedreader.readLine().also { string = it } != null) {
                 // Should return error - expected to be not authenticated.
                 // TODO: Remove
-                Log.d("[authenticate]", "Response 1: $string")
+                //Log.d("[authenticate]", "Response 1: $string")
             }
-
-            // This may break it!
-            conn.disconnect()
 
             Log.i("[authenticate]","Authenticating client")
 
@@ -257,7 +203,6 @@ class MainActivity : AppCompatActivity() {
 
             if (responseCode != 200) {
                 Log.e("[authenticate]","[verify] Server returned HTTP Error " + responseCode.toString())
-                Sentry.captureMessage("Server HTTP error: "+responseCode.toString())
                 // This maybe should call exit or drop an alert
                 return
             }
@@ -279,7 +224,6 @@ class MainActivity : AppCompatActivity() {
             } catch (e: java.lang.Exception) {
                 Log.e(tag, "[verify] Authentication InputStream Exception:")
                 if (this.inDevelopment()) e.printStackTrace()
-                Sentry.captureException(e)
             } finally {
                 urlConnection.disconnect()
             }
@@ -287,7 +231,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.d(tag, "[verify] Verification Exception.")
             if (this.inDevelopment()) e.printStackTrace()
-            Sentry.captureException(e)
             System.exit(0)
         }
     }
@@ -387,7 +330,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            response = okHttpClient.newCall(request).execute().use {
+            var response2 = okHttpClient.newCall(request).execute().use {
                     response ->
                 {
                     Log.d(tag, "Response 3B:" + response.body?.string()!!)

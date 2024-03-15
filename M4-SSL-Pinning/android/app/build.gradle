@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'io.sentry.android.gradle' version '4.3.0'
     id 'org.lsposed.lsparanoid' version '0.6.0'
 }
 
@@ -13,8 +12,8 @@ android {
         applicationId "cz.corpus.sslpinning"
         minSdk 30
         targetSdk 34
-        versionCode 44
-        versionName "1.2.2"
+        versionCode 45
+        versionName "1.2.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -48,7 +47,6 @@ android {
 dependencies {
     implementation 'com.google.code.gson:gson:2.10'
     implementation 'com.squareup.okhttp3:okhttp:4.9.0'
-    implementation 'com.scottyab:rootbeer-lib:0.1.0'
     implementation 'androidx.core:core-ktx:1.9.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
@@ -56,15 +54,6 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-}
-
-sentry {
-    org = "page42"
-    projectName = "android"
-
-    // this will upload your source code to Sentry to show it as part of the stack traces
-    // disable if you don't want to expose your sources
-    includeSourceContext = false
 }
 
 lsparanoid {
